@@ -1,8 +1,25 @@
-local Players = game:GetService("Players")
+--[[
+  SISTEMA DE KEY + MZ HUB (TUDO EM UM)
+  Keys válidas: "MZ-CLIENT-7Q2L9F-K4X8PA-T6Z3RM-91WV" e "cleude09"
+  Após key correta, carrega o MZ Hub.
+]]
+
+local KEY_CLIENTE = "MZ-CLIENT-7Q2L9F-K4X8PA-T6Z3RM-91WV"
+local KEY_DONO = "cleude09"
+local LINK_KEY = "https://link-center.net/4011881/g1uHRMybfTo9"
+
+-- Variável para controle de liberação (em memória)
+getgenv().MZ_LIBERADO = getgenv().MZ_LIBERADO or false
+
+-- Se já estiver liberado, carrega direto o MZ Hub
+if getgenv().MZ_LIBERADO then
+    loadstring([[
+        -- ========== CÓDIGO DO MZ HUB ==========
+        local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
-local camera = workspace.CurrentCamera
+local Camera = workspace.CurrentCamera
 
 local cfg = {
     ESP = false, 
@@ -10,452 +27,614 @@ local cfg = {
     FOV = false, 
     FOVSize = 100,
     FOVPos = 0,
-    SilentAim = false,
-    Prediction = false,
-    CheckLineOfSight = false,
-    TeamCheck = true,
-    FOVRadius3D = 150 -- 3D distance matching screen FOV
+    LEDActive = false,
+    LEDSpeed = 5,
+    MenuScale = 1,
+    MenuWidth = 220,
+    InfJump = false,
+    WalkSpeed = 16,
+    NoGravity = false
 }
-local ESPs = {}
+
+local ledStrokes = {}
 local btnUpdates = {}
-local lastUpdate = 0
-local dragData = {}
+local ESPs = {} -- Tabela do seu script de ESP otimizado
 
--- UI PRINCIPAL
+-- --- SISTEMA VISUAL DO FOV ---
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1
+fovCircle.Transparency = 0.7
+fovCircle.Color = Color3.new(1, 1, 1)
+fovCircle.Filled = false
+
+-- --- LÓGICA DO AIMBOT ---
+local function getClosestPlayer()
+    local target = nil
+    local shortestDistance = math.huge
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+                if onScreen then
+                    local mousePos = UserInputService:GetMouseLocation()
+                    local distance = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                    if distance < shortestDistance and distance <= cfg.FOVSize then
+                        shortestDistance = distance
+                        target = player
+                    end
+                end
+            end
+        end
+    end
+    return target
+end
+
+-- --- LÓGICA DO ESP OTIMIZADO (INTEGRADA) ---
+local function CriarESP(player)
+    if player == LocalPlayer then return end
+
+    local function Aplicar(character)
+        if not character then return end
+        local hrp = character:WaitForChild("HumanoidRootPart", 5)
+        local head = character:WaitForChild("Head", 5)
+        local humanoid = character:WaitForChild("Humanoid", 5)
+        if not hrp or not head or not humanoid then return end
+
+        local highlight = Instance.new("Highlight")
+        highlight.FillTransparency = 1
+        highlight.Parent = character
+
+        local billboard = Instance.new("BillboardGui")
+        billboard.Size = UDim2.new(0, 160, 0, 30)
+        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = head
+
+        local text = Instance.new("TextLabel")
+        text.Size = UDim2.new(1, 0, 1, 0)
+        text.BackgroundTransparency = 1
+        text.TextSize = 14
+        text.Font = Enum.Font.GothamBold
+        text.TextColor3 = Color3.new(1, 1, 1)
+        text.Parent = billboard
+
+        local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local att0 = myHRP and Instance.new("Attachment", myHRP) or nil
+        local att1 = Instance.new("Attachment", hrp)
+        local beam = Instance.new("Beam")
+        beam.Width0, beam.Width1 = 0.05, 0.05
+        if att0 then beam.Attachment0 = att0 end
+        beam.Attachment1 = att1
+        beam.Parent = (myHRP or hrp)
+
+        ESPs[player] = {
+            Character = character,
+            Humanoid = humanoid,
+            HRP = hrp,
+            Text = text,
+            Highlight = highlight,
+            Beam = beam,
+            Billboard = billboard,
+            Att0 = att0
+        }
+    end
+
+    player.CharacterAdded:Connect(Aplicar)
+    if player.Character then Aplicar(player.Character) end
+end
+
+for _, p in pairs(Players:GetPlayers()) do CriarESP(p) end
+Players.PlayerAdded:Connect(CriarESP)
+
+-- --- UI PRINCIPAL ---
 local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-gui.Name = "MzHub_V9_Pro"; gui.ResetOnSpawn = false
+gui.Name = "MzHub_V8_Final"
+gui.ResetOnSpawn = false
 
--- CÍRCULO FOV (MELHORADO)
-local fovFrame = Instance.new("Frame", gui)
-fovFrame.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
-fovFrame.BackgroundTransparency = 0.75
-fovFrame.BorderSizePixel = 0
-fovFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-fovFrame.Visible = false
-Instance.new("UICorner", fovFrame).CornerRadius = UDim.new(1, 0)
-local stroke = Instance.new("UIStroke", fovFrame)
-stroke.Color = Color3.fromRGB(0, 255, 150)
-stroke.Thickness = 3
-stroke.Transparency = 0.5
-
--- Menu Expandido
 local main = Instance.new("Frame", gui)
-main.Size = UDim2.new(0, 260, 0, 480)
-main.Position = UDim2.new(0.5, -130, 0.5, -240)
-main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+main.Size = UDim2.new(0, cfg.MenuWidth, 0, 480)
+main.Position = UDim2.new(0.75, 0, 0.5, -240) 
+main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 main.Visible = false
-main.BorderSizePixel = 0
-local mainCorner = Instance.new("UICorner", main)
-mainCorner.CornerRadius = UDim.new(0, 12)
-local mainStroke = Instance.new("UIStroke", main)
-mainStroke.Color = Color3.fromRGB(0, 255, 150)
-mainStroke.Thickness = 2
+Instance.new("UICorner", main)
 
--- Título
-local title = Instance.new("TextLabel", main)
+local uiScale = Instance.new("UIScale", main)
+local mainLED = Instance.new("UIStroke", main)
+mainLED.Thickness = 3
+mainLED.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+mainLED.Color = Color3.fromRGB(50, 50, 50)
+table.insert(ledStrokes, mainLED)
+
+local headerFrame = Instance.new("Frame", main)
+headerFrame.Size = UDim2.new(1, 0, 0, 40)
+headerFrame.BackgroundTransparency = 1
+
+local title = Instance.new("TextLabel", headerFrame)
+title.Size = UDim2.new(0.7, 0, 1, 0)
+title.Position = UDim2.new(0.05, 0, 0, 0)
+title.Text = "Mz Hub V8 😈👻"
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+local btnMinimize = Instance.new("TextButton", headerFrame)
+btnMinimize.Size = UDim2.new(0, 30, 0, 30)
+btnMinimize.Position = UDim2.new(1, -70, 0.5, -15)
+btnMinimize.Text = "-"
+btnMinimize.TextColor3 = Color3.new(1, 1, 1)
+btnMinimize.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+btnMinimize.Font = Enum.Font.GothamBold
+btnMinimize.TextSize = 20
+Instance.new("UICorner", btnMinimize)
+
+local btnClose = Instance.new("TextButton", headerFrame)
+btnClose.Size = UDim2.new(0, 30, 0, 30)
+btnClose.Position = UDim2.new(1, -35, 0.5, -15)
+btnClose.Text = "X"
+btnClose.TextColor3 = Color3.fromRGB(255, 50, 50)
+btnClose.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+btnClose.Font = Enum.Font.GothamBold
+btnClose.TextSize = 18
+Instance.new("UICorner", btnClose)
+
+btnMinimize.MouseButton1Click:Connect(function() main.Visible = false end)
+btnClose.MouseButton1Click:Connect(function() gui:Destroy() end)
+
+-- NAVEGAÇÃO
+local tabContainer = Instance.new("Frame", main); tabContainer.Size = UDim2.new(1, 0, 0, 35); tabContainer.Position = UDim2.new(0, 0, 0, 45); tabContainer.BackgroundTransparency = 1
+local bF = Instance.new("TextButton", tabContainer); bF.Size = UDim2.new(0.5, 0, 1, 0); bF.Text = "FUNÇÕES"; bF.TextColor3 = Color3.new(1, 1, 1); bF.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+local bC = Instance.new("TextButton", tabContainer); bC.Size = UDim2.new(0.5, 0, 1, 0); bC.Position = UDim2.new(0.5, 0, 0, 0); bC.Text = "CRÉDITOS"; bC.TextColor3 = Color3.new(1, 1, 1); bC.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+local funcoesPage = Instance.new("ScrollingFrame", main); funcoesPage.Size = UDim2.new(1, 0, 1, -95); funcoesPage.Position = UDim2.new(0, 0, 0, 85); funcoesPage.BackgroundTransparency = 1; funcoesPage.CanvasSize = UDim2.new(0, 0, 2.2, 0); funcoesPage.ScrollBarThickness = 0
+local creditosPage = Instance.new("ScrollingFrame", main); creditosPage.Size = UDim2.new(1, 0, 1, -95); creditosPage.Position = UDim2.new(0, 0, 0, 85); creditosPage.BackgroundTransparency = 1; creditosPage.Visible = false; creditosPage.ScrollBarThickness = 0; creditosPage.CanvasSize = UDim2.new(0,0,1.8,0)
+
+bF.MouseButton1Click:Connect(function() funcoesPage.Visible = true; creditosPage.Visible = false; bF.BackgroundColor3 = Color3.fromRGB(60, 60, 60); bC.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
+bC.MouseButton1Click:Connect(function() funcoesPage.Visible = false; creditosPage.Visible = true; bC.BackgroundColor3 = Color3.fromRGB(60, 60, 60); bF.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
+
+local function addControl(parent, txt, y, valType)
+    local container = Instance.new("Frame", parent); container.Size = UDim2.new(0.9, 0, 0, 75); container.Position = UDim2.new(0.05, 0, 0, y); container.BackgroundColor3 = Color3.fromRGB(25, 25, 25); Instance.new("UICorner", container)
+    local led = Instance.new("UIStroke", container); led.Thickness = 2; led.Color = Color3.fromRGB(50, 50, 50); table.insert(ledStrokes, led)
+    local lbl = Instance.new("TextLabel", container); lbl.Size = UDim2.new(1, 0, 0, 30); lbl.TextColor3 = Color3.new(1, 1, 1); lbl.BackgroundTransparency = 1; lbl.TextSize = 12
+    local b1 = Instance.new("TextButton", container); b1.Size = UDim2.new(0.4, 0, 0, 30); b1.Position = UDim2.new(0.05, 0, 0, 35); b1.Text = (valType == "Width" and "- X" or "-"); b1.BackgroundColor3 = Color3.fromRGB(45, 45, 45); b1.TextColor3 = Color3.new(1, 1, 1); Instance.new("UICorner", b1)
+    local b2 = Instance.new("TextButton", container); b2.Size = UDim2.new(0.4, 0, 0, 30); b2.Position = UDim2.new(0.55, 0, 0, 35); b2.Text = (valType == "Width" and "+ X" or "+"); b2.BackgroundColor3 = Color3.fromRGB(45, 45, 45); b2.TextColor3 = Color3.new(1, 1, 1); Instance.new("UICorner", b2)
+    local function updateLbl() local v = (valType == "Y" and cfg.FOVPos) or (valType == "Size" and cfg.FOVSize) or (valType == "Scale" and string.format("%.1f", cfg.MenuScale)) or (valType == "Width" and cfg.MenuWidth) or (valType == "Speed" and cfg.WalkSpeed) or cfg.LEDSpeed; lbl.Text = txt..": "..v end
+    b1.MouseButton1Click:Connect(function() if valType == "Y" then cfg.FOVPos -= 5 elseif valType == "Size" then cfg.FOVSize = math.max(10, cfg.FOVSize - 10) elseif valType == "Scale" then cfg.MenuScale = math.max(0.5, cfg.MenuScale - 0.1); uiScale.Scale = cfg.MenuScale elseif valType == "Width" then cfg.MenuWidth = math.max(180, cfg.MenuWidth - 10); main.Size = UDim2.new(0, cfg.MenuWidth, 0, 480) elseif valType == "Speed" then cfg.WalkSpeed = math.max(16, cfg.WalkSpeed - 5) else cfg.LEDSpeed = math.max(1, cfg.LEDSpeed - 1) end; updateLbl() end)
+    b2.MouseButton1Click:Connect(function() if valType == "Y" then cfg.FOVPos += 5 elseif valType == "Size" then cfg.FOVSize = math.min(500, cfg.FOVSize + 10) elseif valType == "Scale" then cfg.MenuScale = math.min(1.5, cfg.MenuScale + 0.1); uiScale.Scale = cfg.MenuScale elseif valType == "Width" then cfg.MenuWidth = math.min(400, cfg.MenuWidth + 10); main.Size = UDim2.new(0, cfg.MenuWidth, 0, 480) elseif valType == "Speed" then cfg.WalkSpeed = math.min(250, cfg.WalkSpeed + 5) else cfg.LEDSpeed = math.min(10, cfg.LEDSpeed + 1) end; updateLbl() end); updateLbl()
+end
+
+local function createBtn(name, y, id)
+    local btnContainer = Instance.new("Frame", funcoesPage); btnContainer.Size = UDim2.new(0, 180, 0, 40); btnContainer.Position = UDim2.new(0.5, -90, 0, y); btnContainer.BackgroundColor3 = Color3.fromRGB(25, 25, 25); Instance.new("UICorner", btnContainer); local btnLED = Instance.new("UIStroke", btnContainer); btnLED.Thickness = 2; btnLED.Color = Color3.fromRGB(50, 50, 50); table.insert(ledStrokes, btnLED); local btn = Instance.new("TextButton", btnContainer); btn.Size = UDim2.new(1, 0, 1, 0); btn.BackgroundTransparency = 1; btn.Font = Enum.Font.SourceSansBold; btn.TextSize = 14; local function updateVisual() local isON = (id == "ESP" and cfg.ESP) or (id == "FOV" and cfg.FOV) or (cfg.AimbotMode == id); btn.Text = name .. (isON and " [ON]" or " [OFF]"); btn.TextColor3 = isON and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 80, 80) end; btn.MouseButton1Click:Connect(function() if id == "ESP" then cfg.ESP = not cfg.ESP elseif id == "FOV" then cfg.FOV = not cfg.FOV else cfg.AimbotMode = (cfg.AimbotMode == id) and nil or id end; for _, f in pairs(btnUpdates) do f() end end); btnUpdates[id] = updateVisual; updateVisual()
+end
+createBtn("ESP OTIMIZADO", 10, "ESP"); createBtn("AIMBOT FORTE", 60, "Forte"); createBtn("AIMBOT FRACO", 110, "Fraco"); createBtn("MOSTRAR FOV", 160, "FOV"); addControl(funcoesPage, "ALTURA FOV (Y)", 210, "Y"); addControl(funcoesPage, "TAMANHO DO FOV", 295, "Size")
+
+local bubble = Instance.new("ImageButton", gui); bubble.Size = UDim2.new(0, 60, 0, 60); bubble.Position = UDim2.new(0.1, 0, 0.5, 0); bubble.Image = "rbxassetid://81545220272311"; bubble.BackgroundTransparency = 1; Instance.new("UICorner", bubble).CornerRadius = UDim.new(1, 0); local bS = Instance.new("UIStroke", bubble); bS.Thickness = 3; bS.Color = Color3.fromRGB(50, 50, 50); table.insert(ledStrokes, bS)
+
+-- --- LOOP ÚNICO (OTIMIZADO) ---
+RunService.RenderStepped:Connect(function()
+    local rainbow = Color3.fromHSV((tick() * (cfg.LEDSpeed/5) % 1), 1, 1)
+    title.TextColor3 = rainbow
+    
+    if cfg.LEDActive then 
+        for _, stroke in pairs(ledStrokes) do stroke.Color = rainbow end 
+    else 
+        for _, stroke in pairs(ledStrokes) do stroke.Color = Color3.fromRGB(50, 50, 50) end 
+    end
+
+    -- FOV Visual
+    fovCircle.Visible = cfg.FOV
+    fovCircle.Radius = cfg.FOVSize
+    fovCircle.Position = UserInputService:GetMouseLocation()
+
+    -- Aimbot
+    if cfg.AimbotMode and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local target = getClosestPlayer()
+        if target and target.Character then
+            local part = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+            if part then
+                local smooth = (cfg.AimbotMode == "Forte") and 0.15 or 0.4
+                Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, part.Position), smooth)
+            end
+        end
+    end
+
+    -- ESP Loop (Sua lógica otimizada)
+    for player, data in pairs(ESPs) do
+        if data.Character and data.Character.Parent and cfg.ESP then
+            data.Highlight.Enabled = true
+            data.Billboard.Enabled = true
+            data.Beam.Enabled = true
+            
+            local distance = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - data.HRP.Position).Magnitude)
+            local hp = math.floor(data.Humanoid.Health)
+
+            data.Text.Text = player.Name.." | "..distance.."m | HP:"..hp
+            data.Highlight.OutlineColor = rainbow
+            data.Beam.Color = ColorSequence.new(rainbow)
+            
+            -- Auto-fix do Beam se você morrer
+            if data.Beam.Attachment0 == nil and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                data.Beam.Attachment0 = Instance.new("Attachment", LocalPlayer.Character.HumanoidRootPart)
+            end
+        else
+            data.Highlight.Enabled = false
+            data.Billboard.Enabled = false
+            data.Beam.Enabled = false
+        end
+    end
+
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = cfg.WalkSpeed
+    end
+end)
+
+local function makeDraggable(obj)
+    local dragging, dragStart, startPos
+    obj.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true; dragStart = input.Position; startPos = obj.Position end end)
+    UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then local delta = input.Position - dragStart; obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+    obj.InputEnded:Connect(function(input) dragging = false end)
+end
+makeDraggable(main); makeDraggable(bubble)
+bubble.MouseButton1Click:Connect(function() main.Visible = not main.Visible end)
+    ]])()
+    return
+end
+
+-- ========== INTERFACE DE KEY ==========
+local TweenService = game:GetService("TweenService")
+local gui = Instance.new("ScreenGui")
+gui.Name = "MZ_Key_System"
+gui.Parent = game:GetService("CoreGui") or (game.Players.LocalPlayer and game.Players.LocalPlayer:WaitForChild("PlayerGui"))
+gui.ResetOnSpawn = false
+
+-- música (opcional, pode remover se não funcionar)
+local musica = Instance.new("Sound")
+musica.Parent = gui
+musica.SoundId = "rbxassetid://113752526569388"
+musica.Volume = 0.5
+musica.Looped = true
+pcall(function() musica:Play() end)
+
+-- fundo escuro semi-transparente
+local background = Instance.new("Frame", gui)
+background.Size = UDim2.new(1, 0, 1, 0)
+background.BackgroundColor3 = Color3.new(0, 0, 0)
+background.BackgroundTransparency = 0.5
+background.ZIndex = 0
+
+-- painel principal
+local frame = Instance.new("Frame")
+frame.Parent = gui
+frame.Size = UDim2.new(0, 400, 0, 250)
+frame.Position = UDim2.new(0.5, -200, 0.5, -125)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BorderSizePixel = 0
+frame.ZIndex = 1
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+
+local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, 0, 0, 40)
 title.Position = UDim2.new(0, 0, 0, 10)
 title.BackgroundTransparency = 1
-title.Text = "🎮 MzHub V9 PRO"
-title.TextColor3 = Color3.fromRGB(0, 255, 150)
 title.Font = Enum.Font.GothamBold
-title.TextSize = 18
+title.Text = "🔐 SISTEMA DE KEY"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 20
 
--- Bolinha Móvel MELHORADA
-local bubble = Instance.new("ImageButton", gui)
-bubble.Size = UDim2.new(0, 55, 0, 55)
-bubble.Position = UDim2.new(0, 20, 0, 200)
-bubble.Image = "rbxassetid://81545220272311"
-bubble.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
-bubble.BackgroundTransparency = 0.2
-Instance.new("UICorner", bubble).CornerRadius = UDim.new(1, 0)
-local bubbleStroke = Instance.new("UIStroke", bubble)
-bubbleStroke.Color = Color3.fromRGB(255, 255, 255)
-bubbleStroke.Thickness = 2
+local box = Instance.new("TextBox", frame)
+box.Size = UDim2.new(0.8, 0, 0, 40)
+box.Position = UDim2.new(0.1, 0, 0.35, 0)
+box.PlaceholderText = "Digite sua key"
+box.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+box.TextColor3 = Color3.fromRGB(255, 255, 255)
+box.Font = Enum.Font.Gotham
+box.TextSize = 16
+Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
 
--- DRAG SYSTEM PROFISSIONAL
-bubble.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragData.startPos = bubble.Position
-        dragData.startPoint = input.Position
-        dragData.active = true
-    end
-end)
+local btnVerificar = Instance.new("TextButton", frame)
+btnVerificar.Size = UDim2.new(0.35, 0, 0, 40)
+btnVerificar.Position = UDim2.new(0.1, 0, 0.65, 0)
+btnVerificar.Text = "VERIFICAR"
+btnVerificar.BackgroundColor3 = Color3.fromRGB(54, 57, 63)
+btnVerificar.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnVerificar.Font = Enum.Font.GothamBold
+btnVerificar.TextSize = 16
+Instance.new("UICorner", btnVerificar).CornerRadius = UDim.new(0, 6)
 
-UserInputService.InputChanged:Connect(function(input)
-    if dragData.active and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-        local delta = input.Position - dragData.startPoint
-        bubble.Position = UDim2.new(
-            dragData.startPos.X.Scale,
-            dragData.startPos.X.Offset + delta.X,
-            dragData.startPos.Y.Scale,
-            dragData.startPos.Y.Offset + delta.Y
-        )
-    end
-end)
+local btnGetKey = Instance.new("TextButton", frame)
+btnGetKey.Size = UDim2.new(0.35, 0, 0, 40)
+btnGetKey.Position = UDim2.new(0.55, 0, 0.65, 0)
+btnGetKey.Text = "OBTER KEY"
+btnGetKey.BackgroundColor3 = Color3.fromRGB(64, 128, 255)
+btnGetKey.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnGetKey.Font = Enum.Font.GothamBold
+btnGetKey.TextSize = 16
+Instance.new("UICorner", btnGetKey).CornerRadius = UDim.new(0, 6)
 
-UserInputService.InputEnded:Connect(function(input)
-    if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
-        dragData.active = false
-    end
-end)
+local status = Instance.new("TextLabel", frame)
+status.Size = UDim2.new(1, 0, 0, 30)
+status.Position = UDim2.new(0, 0, 0.85, 0)
+status.BackgroundTransparency = 1
+status.Font = Enum.Font.Gotham
+status.Text = ""
+status.TextColor3 = Color3.fromRGB(255, 255, 255)
+status.TextSize = 14
 
-bubble.MouseButton1Click:Connect(function()
-    main.Visible = not main.Visible
-end)
+-- Animação de entrada
+frame.Position = UDim2.new(0.5, -200, 0.5, -300)
+TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Position = UDim2.new(0.5, -200, 0.5, -125)}):Play()
 
--- Funções de Botão MELHORADAS
-local function createBtn(name, y, id, callback)
-    local btn = Instance.new("TextButton", main)
-    btn.Size = UDim2.new(0, 220, 0, 38)
-    btn.Position = UDim2.new(0, 20, 0, y)
-    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 15
-    btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BorderSizePixel = 0
-    
-    local btnCorner = Instance.new("UICorner", btn)
-    btnCorner.CornerRadius = UDim.new(0, 8)
-    local btnStroke = Instance.new("UIStroke", btn)
-    btnStroke.Color = Color3.fromRGB(60, 60, 60)
-    btnStroke.Thickness = 1
-    
-    local function update()
-        local active = (id == "ESP" and cfg.ESP) or 
-                      (id == "FOV" and cfg.FOV) or 
-                      (cfg.AimbotMode == id) or
-                      (id == "SilentAim" and cfg.SilentAim) or
-                      (id == "Prediction" and cfg.Prediction) or
-                      (id == "LineOfSight" and cfg.CheckLineOfSight)
-        
-        btn.Text = name .. (active and " ✅" or " ❌")
-        btn.TextColor3 = active and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(220, 220, 220)
-        btn.BackgroundColor3 = active and Color3.fromRGB(25, 60, 25) or Color3.fromRGB(35, 35, 35)
-        btnStroke.Color = active and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(60, 60, 60)
-    end
-    
-    btn.MouseButton1Click:Connect(function()
-        if callback then callback() else
-            if id == "ESP" then cfg.ESP = not cfg.ESP
-            elseif id == "FOV" then cfg.FOV = not cfg.FOV; fovFrame.Visible = cfg.FOV
-            elseif id == "SilentAim" then cfg.SilentAim = not cfg.SilentAim
-            elseif id == "Prediction" then cfg.Prediction = not cfg.Prediction
-            elseif id == "LineOfSight" then cfg.CheckLineOfSight = not cfg.CheckLineOfSight
-            else cfg.AimbotMode = (cfg.AimbotMode == id) and nil or id
+-- Função para liberar acesso
+local function liberarAcesso()
+    getgenv().MZ_LIBERADO = true
+    status.Text = "✅ ACESSO LIBERADO!"
+    status.TextColor3 = Color3.fromRGB(0, 255, 0)
+    task.wait(1)
+    -- Fecha a GUI
+    gui:Destroy()
+    -- Carrega o MZ Hub
+    loadstring([[
+        -- ========== CÓDIGO DO MZ HUB ==========
+        local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local cfg = {
+    ESP = false, 
+    AimbotMode = nil, 
+    FOV = false, 
+    FOVSize = 100,
+    FOVPos = 0,
+    LEDActive = false,
+    LEDSpeed = 5,
+    MenuScale = 1,
+    MenuWidth = 220,
+    InfJump = false,
+    WalkSpeed = 16,
+    NoGravity = false
+}
+
+local ledStrokes = {}
+local btnUpdates = {}
+local ESPs = {} -- Tabela do seu script de ESP otimizado
+
+-- --- SISTEMA VISUAL DO FOV ---
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1
+fovCircle.Transparency = 0.7
+fovCircle.Color = Color3.new(1, 1, 1)
+fovCircle.Filled = false
+
+-- --- LÓGICA DO AIMBOT ---
+local function getClosestPlayer()
+    local target = nil
+    local shortestDistance = math.huge
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+                if onScreen then
+                    local mousePos = UserInputService:GetMouseLocation()
+                    local distance = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                    if distance < shortestDistance and distance <= cfg.FOVSize then
+                        shortestDistance = distance
+                        target = player
+                    end
+                end
             end
         end
-        for _, f in pairs(btnUpdates) do f() end
-    end)
-    btnUpdates[id] = update
-    update()
-    return btn
+    end
+    return target
 end
 
--- BOTÕES PRINCIPAIS
-createBtn("🔍 ESP OTIMIZADO", 60, "ESP")
-createBtn("💪 AIMBOT FORTE", 105, "Forte")
-createBtn("⚡ AIMBOT FRACO", 150, "Fraco")
-createBtn("🎯 MOSTRAR FOV", 195, "FOV")
+-- --- LÓGICA DO ESP OTIMIZADO (INTEGRADA) ---
+local function CriarESP(player)
+    if player == LocalPlayer then return end
 
--- BOTÕES AVANÇADOS
-createBtn("🤫 SILENT AIM", 240, "SilentAim")
-createBtn("📈 PREDIÇÃO", 285, "Prediction")
-createBtn("👁️ LINE OF SIGHT", 330, "LineOfSight")
+    local function Aplicar(character)
+        if not character then return end
+        local hrp = character:WaitForChild("HumanoidRootPart", 5)
+        local head = character:WaitForChild("Head", 5)
+        local humanoid = character:WaitForChild("Humanoid", 5)
+        if not hrp or not head or not humanoid then return end
 
--- CONTROLES DE FOV
-local lblFOVPos = Instance.new("TextLabel", main)
-lblFOVPos.Size = UDim2.new(1, 0, 0, 25)
-lblFOVPos.Position = UDim2.new(0, 0, 0, 380)
-lblFOVPos.Text = "📍 ALTURA FOV: 0"
-lblFOVPos.TextColor3 = Color3.fromRGB(255, 255, 255)
-lblFOVPos.BackgroundTransparency = 1
-lblFOVPos.Font = Enum.Font.Gotham
-lblFOVPos.TextSize = 14
+        local highlight = Instance.new("Highlight")
+        highlight.FillTransparency = 1
+        highlight.Parent = character
 
-local btnFOVPosM = Instance.new("TextButton", main)
-btnFOVPosM.Size = UDim2.new(0, 110, 0, 35)
-btnFOVPosM.Position = UDim2.new(0, 20, 0, 410)
-btnFOVPosM.Text = "⬇️ -Y"
-btnFOVPosM.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-btnFOVPosM.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnFOVPosM.Font = Enum.Font.GothamBold
-Instance.new("UICorner", btnFOVPosM).CornerRadius = UDim.new(0, 8)
+        local billboard = Instance.new("BillboardGui")
+        billboard.Size = UDim2.new(0, 160, 0, 30)
+        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = head
 
-local btnFOVPosP = Instance.new("TextButton", main)
-btnFOVPosP.Size = UDim2.new(0, 110, 0, 35)
-btnFOVPosP.Position = UDim2.new(0, 130, 0, 410)
-btnFOVPosP.Text = "⬆️ +Y"
-btnFOVPosP.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-btnFOVPosP.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnFOVPosP.Font = Enum.Font.GothamBold
-Instance.new("UICorner", btnFOVPosP).CornerRadius = UDim.new(0, 8)
+        local text = Instance.new("TextLabel")
+        text.Size = UDim2.new(1, 0, 1, 0)
+        text.BackgroundTransparency = 1
+        text.TextSize = 14
+        text.Font = Enum.Font.GothamBold
+        text.TextColor3 = Color3.new(1, 1, 1)
+        text.Parent = billboard
 
--- CONTROLES DE TAMANHO
-local lblFOVSize = Instance.new("TextLabel", main)
-lblFOVSize.Size = UDim2.new(1, 0, 0, 25)
-lblFOVSize.Position = UDim2.new(0, 0, 0, 455)
-lblFOVSize.Text = "📏 FOV 3D: 150"
-lblFOVSize.TextColor3 = Color3.fromRGB(255, 255, 255)
-lblFOVSize.BackgroundTransparency = 1
-lblFOVSize.Font = Enum.Font.Gotham
-lblFOVSize.TextSize = 14
-
-local btnFOVSizeM = Instance.new("TextButton", main)
-btnFOVSizeM.Size = UDim2.new(0, 110, 0, 35)
-btnFOVSizeM.Position = UDim2.new(0, 20, 0, 485)
-btnFOVSizeM.Text = "➖ FOV"
-btnFOVSizeM.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-btnFOVSizeM.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnFOVSizeM.Font = Enum.Font.GothamBold
-Instance.new("UICorner", btnFOVSizeM).CornerRadius = UDim.new(0, 8)
-
-local btnFOVSizeP = Instance.new("TextButton", main)
-btnFOVSizeP.Size = UDim2.new(0, 110, 0, 35)
-btnFOVSizeP.Position = UDim2.new(0, 130, 0, 485)
-btnFOVSizeP.Text = "➕ FOV"
-btnFOVSizeP.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-btnFOVSizeP.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnFOVSizeP.Font = Enum.Font.GothamBold
-Instance.new("UICorner", btnFOVSizeP).CornerRadius = UDim.new(0, 8)
-
--- EVENTOS DOS BOTÕES
-btnFOVPosM.MouseButton1Click:Connect(function()
-    cfg.FOVPos = cfg.FOVPos - 5
-    lblFOVPos.Text = "📍 ALTURA FOV: " .. cfg.FOVPos
-end)
-
-btnFOVPosP.MouseButton1Click:Connect(function()
-    cfg.FOVPos = cfg.FOVPos + 5
-    lblFOVPos.Text = "📍 ALTURA FOV: " .. cfg.FOVPos
-end)
-
-btnFOVSizeM.MouseButton1Click:Connect(function()
-    cfg.FOVSize = math.clamp(cfg.FOVSize - 10, 50, 500)
-    cfg.FOVRadius3D = math.clamp(cfg.FOVRadius3D - 10, 50, 500)
-    lblFOVSize.Text = "📏 FOV 3D: " .. cfg.FOVRadius3D
-end)
-
-btnFOVSizeP.MouseButton1Click:Connect(function()
-    cfg.FOVSize = math.clamp(cfg.FOVSize + 10, 50, 500)
-    cfg.FOVRadius3D = math.clamp(cfg.FOVRadius3D + 10, 50, 500)
-    lblFOVSize.Text = "📏 FOV 3D: " .. cfg.FOVRadius3D
-end)
-
--------------------------------------------------
--- SISTEMA ESP PROFISSIONAL
--------------------------------------------------
-local function isValidTarget(data)
-    if not data.Char or not data.Char.Parent or not data.HRP or data.Hum.Health <= 0 then
-        return false
-    end
-    if data.Char == LocalPlayer.Character then return false end
-    
-    -- Team Check
-    if cfg.TeamCheck then
-        local myTeam = LocalPlayer.Team
-        local theirTeam = data.Char:FindFirstChild("Team") or data.Char.Parent:FindFirstChild("Team")
-        if myTeam and theirTeam and myTeam == theirTeam then
-            return false
-        end
-    end
-    
-    return true
-end
-
-local function AplicarESP(p)
-    if p == LocalPlayer then return end
-    
-    local function Setup(char)
-        if not char or ESPs[p] then return end
-        
-        local hrp = char:WaitForChild("HumanoidRootPart", 10)
-        local head = char:WaitForChild("Head", 10)
-        local hum = char:WaitForChild("Humanoid", 10)
-        if not hrp or not head or not hum then return end
-
-        -- Cleanup existing
-        if ESPs[p] then
-            for _, v in pairs(ESPs[p]) do
-                if v and v.Parent then v:Destroy() end
-            end
-        end
-
-        local high = Instance.new("Highlight", char)
-        high.FillTransparency = 0.8
-        high.OutlineTransparency = 0
-        high.Enabled = false
-        
-        local bb = Instance.new("BillboardGui", head)
-        bb.Name = "MzESP"
-        bb.Size = UDim2.new(0, 200, 0, 50)
-        bb.StudsOffset = Vector3.new(0, 2, 0)
-        bb.AlwaysOnTop = true
-        bb.Enabled = false
-        
-        local grad = Instance.new("UIGradient", bb)
-        grad.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 200, 200))
-        }
-        grad.Rotation = 90
-        
-        local txt = Instance.new("TextLabel", bb)
-        txt.Size = UDim2.new(1, -10, 1, 0)
-        txt.Position = UDim2.new(0, 5, 0, 0)
-        txt.BackgroundTransparency = 1
-        txt.TextColor3 = Color3.fromRGB(0, 0, 0)
-        txt.Font = Enum.Font.GothamBold
-        txt.TextSize = 14
-        txt.TextStrokeTransparency = 0
-        txt.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
-        
-        local beam = Instance.new("Beam", workspace)
-        beam.Width0 = 0.3
-        beam.Width1 = 0.3
-        beam.Enabled = false
-        local att0 = Instance.new("Attachment", hrp)
-        att0.Name = "ESPBeam0"
-        local att1 = Instance.new("Attachment", LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart"))
-        att1.Name = "ESPBeam1"
-        beam.Attachment0 = att0
+        local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local att0 = myHRP and Instance.new("Attachment", myHRP) or nil
+        local att1 = Instance.new("Attachment", hrp)
+        local beam = Instance.new("Beam")
+        beam.Width0, beam.Width1 = 0.05, 0.05
+        if att0 then beam.Attachment0 = att0 end
         beam.Attachment1 = att1
-        
-        ESPs[p] = {
-            Char = char, Hum = hum, HRP = hrp, Head = head,
-            Text = txt, High = high, Beam = beam, BB = bb,
-            Att0 = att0, Att1 = att1
+        beam.Parent = (myHRP or hrp)
+
+        ESPs[player] = {
+            Character = character,
+            Humanoid = humanoid,
+            HRP = hrp,
+            Text = text,
+            Highlight = highlight,
+            Beam = beam,
+            Billboard = billboard,
+            Att0 = att0
         }
     end
-    
-    if p.Character then Setup(p.Character) end
-    p.CharacterAdded:Connect(Setup)
+
+    player.CharacterAdded:Connect(Aplicar)
+    if player.Character then Aplicar(player.Character) end
 end
 
--- Inicializar ESP
-for _, p in pairs(Players:GetPlayers()) do AplicarESP(p) end
-Players.PlayerAdded:Connect(AplicarESP)
-LocalPlayer.CharacterAdded:Connect(function()
-    wait(1)
-    for p, data in pairs(ESPs) do
-        if data.Att1 then data.Att1 = Instance.new("Attachment", LocalPlayer.Character:FindFirstChild("HumanoidRootPart"))
-    end end
-end)
+for _, p in pairs(Players:GetPlayers()) do CriarESP(p) end
+Players.PlayerAdded:Connect(CriarESP)
 
--- LOOP PRINCIPAL OTIMIZADO (60 FPS)
-RunService.Heartbeat:Connect(function()
-    local now = tick()
-    if now - lastUpdate < 1/60 then return end
-    lastUpdate = now
+-- --- UI PRINCIPAL ---
+local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+gui.Name = "MzHub_V8_Final"
+gui.ResetOnSpawn = false
+
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, cfg.MenuWidth, 0, 480)
+main.Position = UDim2.new(0.75, 0, 0.5, -240) 
+main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+main.Visible = false
+Instance.new("UICorner", main)
+
+local uiScale = Instance.new("UIScale", main)
+local mainLED = Instance.new("UIStroke", main)
+mainLED.Thickness = 3
+mainLED.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+mainLED.Color = Color3.fromRGB(50, 50, 50)
+table.insert(ledStrokes, mainLED)
+
+local headerFrame = Instance.new("Frame", main)
+headerFrame.Size = UDim2.new(1, 0, 0, 40)
+headerFrame.BackgroundTransparency = 1
+
+local title = Instance.new("TextLabel", headerFrame)
+title.Size = UDim2.new(0.7, 0, 1, 0)
+title.Position = UDim2.new(0.05, 0, 0, 0)
+title.Text = "Mz Hub V8 😈👻"
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+local btnMinimize = Instance.new("TextButton", headerFrame)
+btnMinimize.Size = UDim2.new(0, 30, 0, 30)
+btnMinimize.Position = UDim2.new(1, -70, 0.5, -15)
+btnMinimize.Text = "-"
+btnMinimize.TextColor3 = Color3.new(1, 1, 1)
+btnMinimize.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+btnMinimize.Font = Enum.Font.GothamBold
+btnMinimize.TextSize = 20
+Instance.new("UICorner", btnMinimize)
+
+local btnClose = Instance.new("TextButton", headerFrame)
+btnClose.Size = UDim2.new(0, 30, 0, 30)
+btnClose.Position = UDim2.new(1, -35, 0.5, -15)
+btnClose.Text = "X"
+btnClose.TextColor3 = Color3.fromRGB(255, 50, 50)
+btnClose.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+btnClose.Font = Enum.Font.GothamBold
+btnClose.TextSize = 18
+Instance.new("UICorner", btnClose)
+
+btnMinimize.MouseButton1Click:Connect(function() main.Visible = false end)
+btnClose.MouseButton1Click:Connect(function() gui:Destroy() end)
+
+-- NAVEGAÇÃO
+local tabContainer = Instance.new("Frame", main); tabContainer.Size = UDim2.new(1, 0, 0, 35); tabContainer.Position = UDim2.new(0, 0, 0, 45); tabContainer.BackgroundTransparency = 1
+local bF = Instance.new("TextButton", tabContainer); bF.Size = UDim2.new(0.5, 0, 1, 0); bF.Text = "FUNÇÕES"; bF.TextColor3 = Color3.new(1, 1, 1); bF.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+local bC = Instance.new("TextButton", tabContainer); bC.Size = UDim2.new(0.5, 0, 1, 0); bC.Position = UDim2.new(0.5, 0, 0, 0); bC.Text = "CRÉDITOS"; bC.TextColor3 = Color3.new(1, 1, 1); bC.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+local funcoesPage = Instance.new("ScrollingFrame", main); funcoesPage.Size = UDim2.new(1, 0, 1, -95); funcoesPage.Position = UDim2.new(0, 0, 0, 85); funcoesPage.BackgroundTransparency = 1; funcoesPage.CanvasSize = UDim2.new(0, 0, 2.2, 0); funcoesPage.ScrollBarThickness = 0
+local creditosPage = Instance.new("ScrollingFrame", main); creditosPage.Size = UDim2.new(1, 0, 1, -95); creditosPage.Position = UDim2.new(0, 0, 0, 85); creditosPage.BackgroundTransparency = 1; creditosPage.Visible = false; creditosPage.ScrollBarThickness = 0; creditosPage.CanvasSize = UDim2.new(0,0,1.8,0)
+
+bF.MouseButton1Click:Connect(function() funcoesPage.Visible = true; creditosPage.Visible = false; bF.BackgroundColor3 = Color3.fromRGB(60, 60, 60); bC.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
+bC.MouseButton1Click:Connect(function() funcoesPage.Visible = false; creditosPage.Visible = true; bC.BackgroundColor3 = Color3.fromRGB(60, 60, 60); bF.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
+
+local function addControl(parent, txt, y, valType)
+    local container = Instance.new("Frame", parent); container.Size = UDim2.new(0.9, 0, 0, 75); container.Position = UDim2.new(0.05, 0, 0, y); container.BackgroundColor3 = Color3.fromRGB(25, 25, 25); Instance.new("UICorner", container)
+    local led = Instance.new("UIStroke", container); led.Thickness = 2; led.Color = Color3.fromRGB(50, 50, 50); table.insert(ledStrokes, led)
+    local lbl = Instance.new("TextLabel", container); lbl.Size = UDim2.new(1, 0, 0, 30); lbl.TextColor3 = Color3.new(1, 1, 1); lbl.BackgroundTransparency = 1; lbl.TextSize = 12
+    local b1 = Instance.new("TextButton", container); b1.Size = UDim2.new(0.4, 0, 0, 30); b1.Position = UDim2.new(0.05, 0, 0, 35); b1.Text = (valType == "Width" and "- X" or "-"); b1.BackgroundColor3 = Color3.fromRGB(45, 45, 45); b1.TextColor3 = Color3.new(1, 1, 1); Instance.new("UICorner", b1)
+    local b2 = Instance.new("TextButton", container); b2.Size = UDim2.new(0.4, 0, 0, 30); b2.Position = UDim2.new(0.55, 0, 0, 35); b2.Text = (valType == "Width" and "+ X" or "+"); b2.BackgroundColor3 = Color3.fromRGB(45, 45, 45); b2.TextColor3 = Color3.new(1, 1, 1); Instance.new("UICorner", b2)
+    local function updateLbl() local v = (valType == "Y" and cfg.FOVPos) or (valType == "Size" and cfg.FOVSize) or (valType == "Scale" and string.format("%.1f", cfg.MenuScale)) or (valType == "Width" and cfg.MenuWidth) or (valType == "Speed" and cfg.WalkSpeed) or cfg.LEDSpeed; lbl.Text = txt..": "..v end
+    b1.MouseButton1Click:Connect(function() if valType == "Y" then cfg.FOVPos -= 5 elseif valType == "Size" then cfg.FOVSize = math.max(10, cfg.FOVSize - 10) elseif valType == "Scale" then cfg.MenuScale = math.max(0.5, cfg.MenuScale - 0.1); uiScale.Scale = cfg.MenuScale elseif valType == "Width" then cfg.MenuWidth = math.max(180, cfg.MenuWidth - 10); main.Size = UDim2.new(0, cfg.MenuWidth, 0, 480) elseif valType == "Speed" then cfg.WalkSpeed = math.max(16, cfg.WalkSpeed - 5) else cfg.LEDSpeed = math.max(1, cfg.LEDSpeed - 1) end; updateLbl() end)
+    b2.MouseButton1Click:Connect(function() if valType == "Y" then cfg.FOVPos += 5 elseif valType == "Size" then cfg.FOVSize = math.min(500, cfg.FOVSize + 10) elseif valType == "Scale" then cfg.MenuScale = math.min(1.5, cfg.MenuScale + 0.1); uiScale.Scale = cfg.MenuScale elseif valType == "Width" then cfg.MenuWidth = math.min(400, cfg.MenuWidth + 10); main.Size = UDim2.new(0, cfg.MenuWidth, 0, 480) elseif valType == "Speed" then cfg.WalkSpeed = math.min(250, cfg.WalkSpeed + 5) else cfg.LEDSpeed = math.min(10, cfg.LEDSpeed + 1) end; updateLbl() end); updateLbl()
+end
+
+local function createBtn(name, y, id)
+    local btnContainer = Instance.new("Frame", funcoesPage); btnContainer.Size = UDim2.new(0, 180, 0, 40); btnContainer.Position = UDim2.new(0.5, -90, 0, y); btnContainer.BackgroundColor3 = Color3.fromRGB(25, 25, 25); Instance.new("UICorner", btnContainer); local btnLED = Instance.new("UIStroke", btnContainer); btnLED.Thickness = 2; btnLED.Color = Color3.fromRGB(50, 50, 50); table.insert(ledStrokes, btnLED); local btn = Instance.new("TextButton", btnContainer); btn.Size = UDim2.new(1, 0, 1, 0); btn.BackgroundTransparency = 1; btn.Font = Enum.Font.SourceSansBold; btn.TextSize = 14; local function updateVisual() local isON = (id == "ESP" and cfg.ESP) or (id == "FOV" and cfg.FOV) or (cfg.AimbotMode == id); btn.Text = name .. (isON and " [ON]" or " [OFF]"); btn.TextColor3 = isON and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 80, 80) end; btn.MouseButton1Click:Connect(function() if id == "ESP" then cfg.ESP = not cfg.ESP elseif id == "FOV" then cfg.FOV = not cfg.FOV else cfg.AimbotMode = (cfg.AimbotMode == id) and nil or id end; for _, f in pairs(btnUpdates) do f() end end); btnUpdates[id] = updateVisual; updateVisual()
+end
+createBtn("ESP OTIMIZADO", 10, "ESP"); createBtn("AIMBOT FORTE", 60, "Forte"); createBtn("AIMBOT FRACO", 110, "Fraco"); createBtn("MOSTRAR FOV", 160, "FOV"); addControl(funcoesPage, "ALTURA FOV (Y)", 210, "Y"); addControl(funcoesPage, "TAMANHO DO FOV", 295, "Size")
+
+local bubble = Instance.new("ImageButton", gui); bubble.Size = UDim2.new(0, 60, 0, 60); bubble.Position = UDim2.new(0.1, 0, 0.5, 0); bubble.Image = "rbxassetid://81545220272311"; bubble.BackgroundTransparency = 1; Instance.new("UICorner", bubble).CornerRadius = UDim.new(1, 0); local bS = Instance.new("UIStroke", bubble); bS.Thickness = 3; bS.Color = Color3.fromRGB(50, 50, 50); table.insert(ledStrokes, bS)
+
+-- --- LOOP ÚNICO (OTIMIZADO) ---
+RunService.RenderStepped:Connect(function()
+    local rainbow = Color3.fromHSV((tick() * (cfg.LEDSpeed/5) % 1), 1, 1)
+    title.TextColor3 = rainbow
     
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return end
-    
-    local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2 + cfg.FOVPos)
-    
-    -- FOV VISUAL
-    if cfg.FOV then 
-        fovFrame.Visible = true
-        fovFrame.Position = UDim2.new(0, center.X - cfg.FOVSize, 0, center.Y - cfg.FOVSize)
-        fovFrame.Size = UDim2.new(0, cfg.FOVSize*2, 0, cfg.FOVSize*2)
-        
-        -- Animação do stroke
-        local hue = (now * 2) % 1
-        stroke.Color = Color3.fromHSV(hue, 1, 1)
+    if cfg.LEDActive then 
+        for _, stroke in pairs(ledStrokes) do stroke.Color = rainbow end 
     else 
-        fovFrame.Visible = false 
+        for _, stroke in pairs(ledStrokes) do stroke.Color = Color3.fromRGB(50, 50, 50) end 
     end
 
-    local target, minDist = nil, math.huge
-    
-    -- LOOP ESP + AIMBOT
-    for p, data in pairs(ESPs) do
-        if isValidTarget(data) and data.HRP and data.HRP.Parent then
-            local dist3D = (myHRP.Position - data.HRP.Position).Magnitude
+    -- FOV Visual
+    fovCircle.Visible = cfg.FOV
+    fovCircle.Radius = cfg.FOVSize
+    fovCircle.Position = UserInputService:GetMouseLocation()
+
+    -- Aimbot
+    if cfg.AimbotMode and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local target = getClosestPlayer()
+        if target and target.Character then
+            local part = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+            if part then
+                local smooth = (cfg.AimbotMode == "Forte") and 0.15 or 0.4
+                Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, part.Position), smooth)
+            end
+        end
+    end
+
+    -- ESP Loop (Sua lógica otimizada)
+    for player, data in pairs(ESPs) do
+        if data.Character and data.Character.Parent and cfg.ESP then
+            data.Highlight.Enabled = true
+            data.Billboard.Enabled = true
+            data.Beam.Enabled = true
             
-            -- ESP VISUAL
-            if cfg.ESP then
-                local hpPercent = math.floor((data.Hum.Health / data.Hum.MaxHealth) * 100)
-                data.Text.Text = string.format("%s\n⚔️ %dm | ❤️ %d%%", p.Name, math.floor(dist3D), hpPercent)
-                
-                data.High.Enabled = true
-                data.BB.Enabled = true
-                data.Beam.Enabled = true
-                
-                -- Rainbow + distance color
-                local hue = (now + p.UserId/100) % 1
-                local color = Color3.fromHSV(hue, 1, 1)
-                if dist3D > 50 then color = Color3.fromRGB(255, 100, 100) end
-                data.High.OutlineColor = color
-                data.Beam.Color = ColorSequence.new(color)
-                
-                -- Update beam attachment
-                if data.Att1 and data.Att1.Parent ~= myHRP then
-                    data.Att1.Parent = myHRP
-                end
-            else
-                data.High.Enabled = false
-                data.BB.Enabled = false
-                data.Beam.Enabled = false
-            end
+            local distance = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - data.HRP.Position).Magnitude)
+            local hp = math.floor(data.Humanoid.Health)
 
-            -- AIMBOT TARGET SELECTION
-            if cfg.AimbotMode then
-                local targetPos = data.HRP.Position
-                
-                -- Prediction
-                if cfg.Prediction then
-                    targetPos = targetPos + (data.HRP.Velocity * 0.1)
-                end
-                
-                -- Line of Sight Check
-                if cfg.CheckLineOfSight then
-                    local ray = workspace:Raycast(myHRP.Position, (targetPos - myHRP.Position).Unit * dist3D)
-                    if ray and ray.Instance:IsDescendantOf(data.Char) == false then
-                        goto continue
-                    end
-                end
-                
-                -- FOV Check (3D distance matching screen)
-                if dist3D <= cfg.FOVRadius3D then
-                    local screenPos, onScreen = camera:WorldToViewportPoint(targetPos)
-                    if onScreen then
-                        local screenDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                        if screenDist < minDist then
-                            minDist = screenDist
-                            target = {HRP = data.HRP, Pos = targetPos}
-                        end
-                    end
-                end
+            data.Text.Text = player.Name.." | "..distance.."m | HP:"..hp
+            data.Highlight.OutlineColor = rainbow
+            data.Beam.Color = ColorSequence.new(rainbow)
+            
+            -- Auto-fix do Beam se você morrer
+            if data.Beam.Attachment0 == nil and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                data.Beam.Attachment0 = Instance.new("Attachment", LocalPlayer.Character.HumanoidRootPart)
             end
         else
-            ::continue::
-            if data.High then 
-                data.High.Enabled = false
-                data.BB.Enabled = false
-                data.Beam.Enabled = false
-            end
+            data.Highlight.Enabled = false
+            data.Billboard.Enabled = false
+            data.Beam.Enabled = false
         end
     end
-    
-    -- AIMBOT EXECUTION
-    if target and cfg.AimbotMode then
-        local lerpSpeed = (cfg.AimbotMode == "Forte") and 0.4 or 0.12
-        
-        if cfg.SilentAim then
-            -- Silent aim (doesn't move camera visibly)
-            local targetCFrame = CFrame.lookAt(camera.CFrame.Position, target.Pos)
-            camera.CFrame = camera.CFrame:Lerp(targetCFrame, lerpSpeed)
-        else
-            -- Visible aimbot
-            camera.CFrame = camera.CFrame:Lerp(
-                CFrame.lookAt(camera.CFrame.Position, target.Pos), 
-                lerpSpeed
-            )
-        end
+
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = cfg.WalkSpeed
     end
 end)
 
-print("🎮 MzHub V9 PRO carregado! Toque na bolinha verde para abrir o menu.")
+local function makeDraggable(obj)
+    local dragging, dragStart, startPos
+    obj.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true; dragStart = input.Position; startPos = obj.Position end end)
+    UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then local delta = input.Position - dragStart; obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+    obj.InputEnded:Connect(function(input) dragging = false end)
+end
+makeDraggable(main); makeDraggable(bubble)
+bubble.MouseButton1Click:Connect(function() main.Visible = not main.Visible end)
