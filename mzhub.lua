@@ -3,8 +3,8 @@ local KeyCliente  = "MZ-CLIENT-7Q2L9F-K4X8PA-T6Z3RM-91WV"
 local KeyDono     = "cleude09"
 local LinkKey     = "https://link-center.net/4011881/g1uHRMybfTo9"
 
-local TempoKey     = 40
-local ResetDuration = 50
+local TempoKey     = 86400
+local ResetDuration = 10
 
 local UsedFile = "mzhub_used.dat"
 local TweenService = game:GetService("TweenService")
