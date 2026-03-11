@@ -1,4 +1,3 @@
-```lua
 --[[
         WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
 ]]
@@ -41,7 +40,7 @@ if not redzlib then error("deu red") end
 workspace.FallenPartsDestroyHeight = -math.huge
 
 local Window = redzlib:MakeWindow({
-    Title = "Mz hub",
+    Title = "Mz Hub",
     SaveFolder = "redz Hub | Brookhaven RP.lua"
 })
 
@@ -67,14 +66,6 @@ game:GetService("ReplicatedStorage").RE:FindFirstChild("1RPNam1eTex1t"):FireServ
 local function copyDiscordLink()
      setclipboard("")
 end
---[[
-local function AntiSkidder()
---     local antiSkidContent =
-game:HttpGet('https://raw.githubusercontent.com/scriptclient/Brookhaven/refs/heads/main/iploggs.lua
-', true)
- --   loadstring(antiSkidContent)()
-end
-]]
 
 local function chatlogs()
 local player = game.Players.LocalPlayer
@@ -86,7 +77,7 @@ gui.Parent = player:WaitForChild("PlayerGui")
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 400, 0, 250)
 frame.Position = UDim2.new(0.5, -200, 0.5, -125)
-frame.BackgroundColor3 = Color3.fromRGB(128, 0, 255)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Alterado para preto
 frame.BackgroundTransparency = 0.3
 frame.BorderSizePixel = 0
 frame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -169,7 +160,7 @@ tween:Play()
 end
 Window:Dialog({
     Title = Translator:traduzir("Seja Bem-Vindo(a)"),
-    Text = Translator:traduzir("E aÃ­! VocÃª acaba de dar o play no Drip Client. NÃ£o se preocupe, ele nÃ£o morde a menos que vocÃª entre em nosso discord. EstÃ¡ aqui o melhor Hub. Bora nessa!"),
+    Text = Translator:traduzir("E aÃ­! VocÃª acaba de dar o play no Mz Hub. NÃ£o se preocupe, ele nÃ£o morde a menos que vocÃª entre em nosso discord. EstÃ¡ aqui o melhor Hub. Bora nessa!"),
     Options = {
         {"Discord", function()
              copyDiscordLink()
@@ -200,7 +191,7 @@ local Tabs = {
 }
 
 Tabs.M:AddDiscordInvite({
-    Name = Translator:traduzir("Drip Hub | Community"),
+    Name = Translator:traduzir("Mz Hub | Community"),
     Description = Translator:traduzir("Junte-se Ã nossa comunidade discord para receber informaÃ§Ãµes sobre a prÃ³xima atualizaÃ§Ã£o"),
     Logo = "rbxassetid://",
     Invite = ""
@@ -332,268 +323,3 @@ getgenv().gg_scripters = "Aori0001"
       }
     )
 end
------------------///////TABS - HH ///////-----------------
-do
-local Config = {
-    defaultSpeed = 16,
-    defaultJumpPower = 50,
-    defaultGravity = 196.2,
-    colorSpeed = 25,
-    updateInterval = 1,
-    statusUpdateInterval = 5
-}
-
-local PlayerStats = {
-    speedValue = Config.defaultSpeed,
-    jumpPower = Config.defaultJumpPower,
-    gravityValue = Config.defaultGravity
-}
-
-Tabs.H:AddSection({Translator:traduzir("Super Poderes")})
-
-local function validateNumber(value, defaultValue)
-    local number = tonumber(value)
-    return number and number or defaultValue
-end
-
-local function updateCharacterProperty(property, value)
-    local character = LocalPlayer.Character
-    if character and character:FindFirstChild("Humanoid") then
-        character.Humanoid[property] = value
-    end
-end
-
-local speedTextBox = Tabs.H:AddTextBox({
-    Title = Translator:traduzir("Velocidade"),
-    Description = "Definir A Velocidade",
-    Default = tostring(Config.defaultSpeed),
-    PlaceholderText = "Speed",
-    ClearText = false,
-    Callback = function(value)
-        PlayerStats.speedValue = validateNumber(value, Config.defaultSpeed)
-        updateCharacterProperty("WalkSpeed", PlayerStats.speedValue)
-    end
-})
-
-local jumpTextBox = Tabs.H:AddTextBox({
-    Title = Translator:traduzir("Pulos"),
-    Description = Translator:traduzir("Definir Os Pulos"),
-    Default = tostring(Config.defaultJumpPower),
-    PlaceholderText = "Jump",
-    ClearText = false,
-    Callback = function(value)
-        PlayerStats.jumpPower = validateNumber(value, Config.defaultJumpPower)
-        updateCharacterProperty("JumpPower", PlayerStats.jumpPower)
-    end
-})
-
-local gravityTextBox = Tabs.H:AddTextBox({
-    Title = Translator:traduzir("Gravidade"),
-    Description = Translator:traduzir("Definir A Gravidade"),
-    Default = tostring(Config.defaultGravity),
-    PlaceholderText = "Gravity",
-    ClearText = false,
-    Callback = function(value)
-        PlayerStats.gravityValue = validateNumber(value, Config.defaultGravity)
-        workspace.Gravity = PlayerStats.gravityValue
-    end
-})
-
-local resetButton = Tabs.H:AddButton({
-    Translator:traduzir("Reseta <Velocidade/Gravidade/Pulos>"),
-    function()
-        PlayerStats.jumpPower = Config.defaultJumpPower
-        PlayerStats.speedValue = Config.defaultSpeed
-        PlayerStats.gravityValue = Config.defaultGravity
-
-           updateCharacterProperty("JumpPower", PlayerStats.jumpPower)
-           updateCharacterProperty("WalkSpeed", PlayerStats.speedValue)
-           workspace.Gravity = PlayerStats.gravityValue
-     end
-})
-
-Tabs.H:AddSection({Translator:traduzir("Status AtualizaÃ§Ã£o")})
-
-local scoutTrack = Tabs.H:AddParagraph({Translator:traduzir("Dev: Kioshi Status")})
-
-task.spawn(function()
-    while true do
-        local scout = workspace:FindFirstChild("scout7ixs")
-        local texto = ""
-
-        if scout then
-            local hrpScout = scout:FindFirstChild("HumanoidRootPart")
-            local hrpLocal = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-               if hrpScout and hrpLocal then
-                   local distancia = math.floor((hrpScout.Position - hrpLocal.Position).Magnitude)
-                   texto = texto .. string.format("estÃ¡ no servidor | DistÃ¢ncia <%d>", distancia)
-               else
-                   texto = texto .. "estÃ¡ no servidor | DistÃ¢ncia <???>"
-               end
-           else
-               texto = texto .. "nÃ£o estÃ¡ no servidor"
-           end
-             scoutTrack:Set(texto)
-             task.wait(Config.updateInterval)
-       end
-end)
-
-local tempoTrack = Tabs.H:AddParagraph({Translator:traduzir("Tempo De Uso De Script")})
-
-local tempoAtual = 0
-task.spawn(function()
-    while true do
-        local horas = math.floor(tempoAtual / 3600)
-        local minutos = math.floor((tempoAtual % 3600) / 60)
-        local segundos = tempoAtual % 60
-
-             local formatado = string.format("%02d:%02d:%02d", horas, minutos, segundos)
-             tempoTrack:Set(" " .. formatado)
-
-             tempoAtual += Config.statusUpdateInterval
-             task.wait(Config.statusUpdateInterval)
-       end
-end)
-
-local fpsParagraph = Tabs.H:AddParagraph({ "Mostra Fps" })
-
-local lastUpdate = 0
-local frameCount = 0
-local currentFPS = 0
-
-RunService.RenderStepped:Connect(function(dt)
-      frameCount += 1
-      lastUpdate += dt
-
-       if lastUpdate >= 1 then
-           currentFPS = frameCount
-           fpsParagraph:Set("FPS: " .. currentFPS)
-           frameCount = 0
-           lastUpdate = 0
-       end
-end)
-
-local playerCountParagraph = Tabs.H:AddParagraph({Translator:traduzir ("Quantidade De Pessoas" )})
-
-local function updatePlayerCount()
-    local count = #Players:GetPlayers()
-    playerCountParagraph:Set(" " .. count)
-end
-
-Players.PlayerAdded:Connect(updatePlayerCount)
-Players.PlayerRemoving:Connect(updatePlayerCount)
-updatePlayerCount()
-
-Tabs.H:AddSection({Translator:traduzir("Basquete <Item>")})
-local BNumber = 1000
-local Toggle = Tabs.H:AddToggle({Name = Translator:traduzir("Arremesso de bolas V2"), Description = Translator:traduzir("Telepkrt/Ball/Volta/Arremessa"), Default = false})
-
-Toggle:Callback(function(state)
-            if state then
-        local Player = game.Players.LocalPlayer
-        local Backpack = Player and Player:FindFirstChild("Backpack")
-        local Mouse = Player and Player:GetMouse()
-        local Character = Player and Player.Character
-        local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-        local RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
-        local Clone = workspace:FindFirstChild("WorkspaceCom") and workspace.WorkspaceCom:FindFirstChild("001_GiveTools") and workspace.WorkspaceCom["001_GiveTools"]:FindFirstChild("Basketball")
-        if not (Player and Backpack and Mouse and Character and Humanoid and RootPart and Clone) then
-            warn("Erro: alguma instÃ¢ncia necessÃ¡ria nÃ£o foi encontrada.")
-            return
-        end
-        local OldPos = RootPart.CFrame
-        for i = 1, BNumber do
-                   task.wait()
-                   RootPart.CFrame = Clone.CFrame
-                   fireclickdetector(Clone:FindFirstChildOfClass("ClickDetector"))
-             end
-
-             task.wait()
-             RootPart.CFrame = OldPos
-             spawn(function()
-                 while state do
-                     task.wait()
-                     for _, tool in ipairs(Character:GetChildren()) do
-                         if tool.Name == "Basketball" then
-                             task.wait(0.0003)
-                               args = {
-                                  Mouse.Hit.p
-                             }
-                             tool:FindFirstChild("ClickEvent"):FireServer(unpack(args))
-                         end
-                     end
-                 end
-             end)
-       end
-end)
-
-Tabs.H:AddSection({Translator:traduzir("Sistema Lgbt")})
-
-local colorSpeed = Config.colorSpeed
-Tabs.H:AddSlider({
-    Name = Translator:traduzir("Velocidade das cores"),
-    Min = 1,
-    Max = 25,
-    Increase = 1,
-    Default = colorSpeed,
-    Callback = function(Value)
-        colorSpeed = Value
-    end
-})
-
-local hairColors = {
-    Color3.new(1, 1, 0), Color3.new(0, 0, 1), Color3.new(1, 0, 1), Color3.new(1, 1, 1),
-    Color3.new(0, 1, 0), Color3.new(0.5, 0, 1), Color3.new(1, 0.647, 0), Color3.new(0, 1, 1)
-}
-
-local vibrantColors = {
-    Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0), Color3.fromRGB(0, 0, 255),
-    Color3.fromRGB(255, 255, 0), Color3.fromRGB(255, 0, 255), Color3.fromRGB(0, 255, 255),
-    Color3.fromRGB(255, 165, 0), Color3.fromRGB(128, 0, 128), Color3.fromRGB(255, 20, 147)
-}
-
-local colors = { "Bright red", "Lime green", "Bright blue", "Bright yellow", "Bright cyan", "Hot pink", "Royal purple" }
-
-local isHairActive, isNameActive, isBioActive, toggleActive, rgbEnabled = false, false, false, false, false
-
-Tabs.H:AddToggle({
-    Name = Translator:traduzir("Cabelo lgbt"),
-    Description = Translator:traduzir("Mudar a cor de cabelo automÃ¡tico"),
-    Default = false,
-    Callback = function(value)
-        isHairActive = value
-    end
-})
-
-Tabs.H:AddToggle({
-    Name = Translator:traduzir("Nome lgbt"),
-    Description = Translator:traduzir("Mudar a cor do nome automÃ¡tico"),
-    Default = false,
-    Callback = function(value)
-        isNameActive = value
-    end
-})
-
-Tabs.H:AddToggle({
-     Name = Translator:traduzir("Bio lgbt"),
-     Description = Translator:traduzir("Mudar a cor da bio automÃ¡tico"),
-     Default = false,
-     Callback = function(value)
-         isBioActive = value
-     end
-})
-
-Tabs.H:AddToggle({
-    Name = Translator:traduzir("Rosas Lgbt"),
-    Description = Translator:traduzir("Muda a cor da rosa automaticamente"),
-    Default = false,
-    Callback = function(value)
-        toggleActive = value
-    end
-})
-
-Tabs.H:AddToggle({
-    Name = Translator:traduzir("Personagem Lgbt"),
-    Description = Translator:traduzir("Deixa seu personagem RGB automaticamente"),
-    Default = fa
