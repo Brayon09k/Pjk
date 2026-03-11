@@ -3420,3 +3420,616 @@ Tabs.TT:AddButton({
         end
 
         ativarDominio()
+        soundLoop = task.spawn(function()
+            local selectedAudioID = 140031333626044
+
+            while expansionActive and not cancelExpansion do
+                local remote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Gu1nSound1s")
+                if remote then
+                    pcall(function()
+                        remote:FireServer(workspace, selectedAudioID, 1)
+                    end)
+                end
+
+                local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local sound = Instance.new("Sound")
+                    sound.SoundId = "rbxassetid://" .. selectedAudioID
+                    sound.Volume = 0.7
+                    sound.Looped = false
+                    sound.Parent = root
+                    sound:Play()
+
+                    sound.Ended:Connect(function()
+                        if sound then sound:Destroy() end
+                    end)
+
+                    local timeLength = sound.TimeLength > 0 and sound.TimeLength or 5
+                    task.wait(timeLength + 0.1)
+                else
+                    warn("HumanoidRootPart nÃ£o encontrado")
+                    break
+                end
+            end
+        end)
+
+        local RE = ReplicatedStorage:WaitForChild("RE")
+        local ClearEvent = RE:FindFirstChild("1Clea1rTool1s")
+        local ToolEvent = RE:FindFirstChild("1Too1l")
+        local FireEvent = RE:FindFirstChild("1Gu1n")
+
+        local function clearAllTools()
+            if ClearEvent then
+                pcall(function()
+                    ClearEvent:FireServer("ClearAllTools")
+                end)
+            end
+end
+
+        local function getAssault()
+            if ToolEvent then
+                pcall(function()
+                    ToolEvent:InvokeServer("PickingTools", "Assault")
+                end)
+            end
+        end
+
+        local function hasAssault()
+            return Player.Backpack:FindFirstChild("Assault") ~= nil
+        end
+
+        local function fireAtPart(targetPart)
+            local gunScript = Player.Backpack:FindFirstChild("Assault") and Player.Backpack.Assault:FindFirstChild("GunScript_Local")
+
+            if not gunScript or not targetPart then return end
+
+            local args = {
+                targetPart,
+                targetPart,
+                Vector3.new(1e14, 1e14, 1e14),
+                targetPart.Position,
+                gunScript:FindFirstChild("MuzzleEffect"),
+                gunScript:FindFirstChild("HitEffect"),
+                0,
+                0,
+                { false },
+                {
+                    25,
+                    Vector3.new(100, 100, 100),
+                    BrickColor.new(29),
+                    0.25,
+                    Enum.Material.SmoothPlastic,
+                    0.25
+                },
+                true,
+                false
+            }
+
+            pcall(function()
+                FireEvent:FireServer(unpack(args))
+            end)
+        end
+
+        local function fireAtAllPlayers(times)
+            for i = 1, times do
+                if not expansionActive or cancelExpansion then break end
+
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if not expansionActive or cancelExpansion then break end
+
+                    if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        fireAtPart(player.Character.HumanoidRootPart)
+                        task.wait(0.1)
+                    end
+                end
+            end
+        end
+
+        fireLoop = task.spawn(function()
+            while expansionActive and not cancelExpansion do
+                clearAllTools()
+                getAssault()
+
+                local attempts = 0
+                repeat
+                    task.wait(0.2)
+                    attempts = attempts + 1
+                until hasAssault() or attempts > 25 or not expansionActive or cancelExpansion
+
+                if expansionActive and not cancelExpansion and hasAssault() then
+                    fireAtAllPlayers(3)
+                end
+
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+_G.HakiAtived = false
+_G.StopHaki = false
+
+local HakiSound
+local StopModel
+local soundLoop
+local fireLoop
+local originalSky
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+local Lighting = game:GetService("Lighting")
+
+local Player = Players.LocalPlayer
+
+Tabs.TT:AddButton({
+    Name = "Haki Do Rei",
+    Callback = function()
+        _G.HakiAtived = true
+        _G.StopHaki = false
+
+        local Character = Player.Character or Player.CharacterAdded:Wait()
+        local Root = Character:WaitForChild("HumanoidRootPart")
+
+        local activationSound = Instance.new("Sound")
+        activationSound.SoundId = "rbxassetid://17887086888"
+        activationSound.Volume = 0.8
+        activationSound.Parent = workspace
+        activationSound:Play()
+        HakiSound = activationSound
+
+        activationSound.Ended:Connect(function()
+            activationSound:Destroy()
+        end)
+
+        local hakiBubble = Instance.new("Part")
+        hakiBubble.Shape = Enum.PartType.Ball
+        hakiBubble.Anchored = true
+        hakiBubble.CanCollide = false
+        hakiBubble.Material = Enum.Material.ForceField
+        hakiBubble.Color = Color3.fromRGB(85, 0, 255)
+        hakiBubble.Transparency = 0.5
+        hakiBubble.Size = Vector3.new(1, 1, 1)
+        hakiBubble.CFrame = Root.CFrame
+        hakiBubble.Parent = workspace
+        StopModel = hakiBubble
+
+        local particles = Instance.new("ParticleEmitter")
+        particles.Texture = "rbxassetid://243098098"
+        particles.Rate = 200
+        particles.Lifetime = NumberRange.new(1)
+        particles.Speed = NumberRange.new(0)
+        particles.Size = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 3),
+            NumberSequenceKeypoint.new(1, 0)
+        }
+        particles.Color = ColorSequence.new(
+            Color3.fromRGB(255, 0, 0),
+            Color3.fromRGB(0, 0, 0)
+        )
+        particles.Parent = hakiBubble
+
+        local expandTween = TweenService:Create(hakiBubble,
+            TweenInfo.new(1.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+            { Size = Vector3.new(80,80,80), Transparency = 1 }
+        )
+        expandTween:Play()
+        Debris:AddItem(hakiBubble, 4)
+
+        local function aplicarHakiCorpo(part)
+            local emitter = Instance.new("ParticleEmitter")
+            emitter.Texture = "rbxassetid://243098098"
+            emitter.Rate = 50
+            emitter.Lifetime = NumberRange.new(0.5)
+            emitter.Speed = NumberRange.new(0)
+            emitter.Size = NumberSequence.new{
+                NumberSequenceKeypoint.new(0,1),
+                NumberSequenceKeypoint.new(1,0)
+            }
+            emitter.Color = ColorSequence.new(
+                Color3.fromRGB(255, 0, 0),
+                Color3.fromRGB(0, 0, 0)
+            )
+            emitter.LightEmission = 0.8
+            emitter.LockedToPart = true
+            emitter.Parent = part
+        end
+
+        for _, part in ipairs(Character:GetChildren()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                aplicarHakiCorpo(part)
+            end
+        end
+
+        soundLoop = task.spawn(function()
+            while _G.HakiAtived and not _G.StopHaki do
+                local remote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Gu1nSound1s")
+                if remote then
+                    pcall(function()
+                        remote:FireServer(workspace, 17887086888, 1)
+                    end)
+                end
+
+                if Root then
+                    local s = Instance.new("Sound")
+                    s.SoundId = "rbxassetid://17887086888"
+                    s.Volume = 0.7
+                    s.Parent = Root
+                    s:Play()
+
+                    s.Ended:Connect(function() s:Destroy() end)
+                    local len = s.TimeLength > 0 and s.TimeLength or 5
+                    task.wait(len + 0.1)
+                else
+                    break
+                end
+            end
+        end)
+
+        fireLoop = task.spawn(function()
+            local RE = ReplicatedStorage:WaitForChild("RE")
+            local ClearEvent = RE:FindFirstChild("1Clea1rTool1s")
+            local ToolEvent = RE:FindFirstChild("1Too1l")
+            local FireEvent = RE:FindFirstChild("1Gu1n")
+
+            local function clearAllTools()
+                if ClearEvent then
+                    pcall(function() ClearEvent:FireServer("ClearAllTools") end)
+                end
+            end
+
+            local function getAssault()
+                if ToolEvent then
+                    pcall(function() ToolEvent:InvokeServer("PickingTools", "Assault") end)
+                end
+            end
+
+            local function hasAssault()
+                return Player.Backpack:FindFirstChild("Assault") ~= nil
+            end
+
+            local function fireAtPart(target)
+                local gunScript = Player.Backpack:FindFirstChild("Assault") and Player.Backpack.Assault:FindFirstChild("GunScript_Local")
+                if not gunScript or not target then return end
+
+                local args = {
+                    target, target,
+                    Vector3.new(1e14,1e14,1e14),
+                    target.Position,
+                    gunScript.MuzzleEffect,
+                    gunScript.HitEffect,
+                    0, 0,
+                    { false },
+                    { 25, Vector3.new(100,100,100), BrickColor.new(29), 0.25, Enum.Material.SmoothPlastic, 0.25 },
+                    true, false
+                }
+                pcall(function() FireEvent:FireServer(unpack(args)) end)
+            end
+
+            while _G.HakiAtived and not _G.StopHaki do
+                clearAllTools()
+                getAssault()
+
+                local tries = 0
+                repeat
+                    task.wait(0.2)
+                    tries += 1
+                until hasAssault() or tries > 25 or not _G.HakiAtived
+
+                if _G.HakiAtived and hasAssault() then
+                    for i = 1, 3 do
+                        if not _G.HakiAtived then break end
+                        for _, pl in ipairs(Players:GetPlayers()) do
+                            if pl ~= Player and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
+                                fireAtPart(pl.Character.HumanoidRootPart)
+                                task.wait(0.1)
+                            end
+                        end
+                    end
+                end
+
+                task.wait(1)
+            end
+        end)
+
+        originalSky = Lighting:FindFirstChildOfClass("Sky")
+    end
+})
+Tabs.TT:AddButton({"Mangekyou Sharigam", function()
+    local Players = game:GetService("Players")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local RunService = game:GetService("RunService")
+    local Lighting = game:GetService("Lighting")
+    local LocalPlayer = Players.LocalPlayer
+    local Remote = ReplicatedStorage:WaitForChild("RE"):FindFirstChild("1Gu1n")
+    local index = 1
+
+    local activationSound = Instance.new("Sound")
+    activationSound.SoundId = "rbxassetid://1592708450"
+    activationSound.Volume = 0.8
+    activationSound.Parent = workspace
+    activationSound:Play()
+    activationSound.Ended:Connect(function()
+        activationSound:Destroy()
+    end)
+
+    local function fireEyes()
+        for _, eyeName in {"LeftEye", "RightEye"} do
+            local eye = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(eyeName)
+            if eye then
+                local fire = Instance.new("Fire")
+                fire.Size = 3
+                fire.Heat = 10
+                fire.Color = Color3.fromRGB(255, 0, 0)
+                fire.SecondaryColor = Color3.fromRGB(0, 0, 0)
+                fire.Parent = eye
+            end
+        end
+    end
+
+    local function shakeCamera()
+        local cam = workspace.CurrentCamera
+        local shake = Instance.new("NumberValue")
+        shake.Name = "CameraShake"
+        shake.Value = 5
+        shake.Parent = cam
+
+        RunService.RenderStepped:Connect(function()
+            if shake.Value > 0 then
+                cam.CFrame = cam.CFrame * CFrame.new(
+                    math.random(-shake.Value, shake.Value) * 0.1,
+                    math.random(-shake.Value, shake.Value) * 0.1,
+                    math.random(-shake.Value, shake.Value) * 0.1
+                )
+            end
+        end)
+
+        task.delay(2, function() shake.Value = 0 end)
+    end
+
+    local function blackFlames()
+        for _, target in pairs(Players:GetPlayers()) do
+            if target ~= LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                local emitter = Instance.new("ParticleEmitter")
+                emitter.Texture = "rbxassetid://243098098"
+                emitter.Color = ColorSequence.new(Color3.fromRGB(0, 0, 0))
+                emitter.LightEmission = 0.5
+                emitter.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 0)})
+                emitter.Lifetime = NumberRange.new(1)
+                emitter.Rate = 50
+                emitter.Speed = NumberRange.new(0.5, 1)
+                emitter.Rotation = NumberRange.new(0, 360)
+                emitter.RotSpeed = NumberRange.new(-90, 90)
+                emitter.Parent = target.Character.HumanoidRootPart
+            end
+        end
+    end
+
+    local function rolar()
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "RotatingImageGui"
+        screenGui.Parent = LocalPlayer.PlayerGui
+        screenGui.ResetOnSpawn = false
+
+        local imageLabel = Instance.new("ImageLabel")
+        imageLabel.Name = "IdiotImage"
+        imageLabel.Size = UDim2.new(0, 200, 0, 200)
+        imageLabel.Position = UDim2.new(0.5, -100, 0.5, -100)
+        imageLabel.BackgroundTransparency = 1
+        imageLabel.Image = "rbxassetid://114416257899946"
+        imageLabel.Parent = screenGui
+
+        local rotationSpeed = 360
+        RunService.RenderStepped:Connect(function(deltaTime)
+            imageLabel.Rotation = (imageLabel.Rotation + rotationSpeed * deltaTime) % 360
+        end)
+    end
+
+    local function colorRed()
+        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.CharacterAdded:Wait()
+        end
+        local pointLight = Instance.new("PointLight")
+        pointLight.Name = "StrongRedLight"
+        pointLight.Color = Color3.fromRGB(255, 0, 0)
+        pointLight.Brightness = 3
+        pointLight.Range = 200
+        pointLight.Shadows = true
+        pointLight.Parent = LocalPlayer.Character.HumanoidRootPart
+    end
+
+    local function fun()
+        RunService.Stepped:Connect(function()
+            local allPlayers = Players:GetPlayers()
+            if #allPlayers < 2 then return end
+
+            index += 1
+            if index > #allPlayers then index = 1 end
+
+            local target = allPlayers[index]
+            if target == LocalPlayer then
+                index += 1
+                if index > #allPlayers then index = 1 end
+                target = allPlayers[index]
+            end
+
+            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                local crazyVector = Vector3.new(
+                    math.random(1e14, 1e15),
+                    math.random(1e14, 1e15),
+                    math.random(1e14, 1e15)
+                )
+
+                local args = {
+                    [1] = target.Character.HumanoidRootPart,
+                    [2] = target.Character.HumanoidRootPart,
+                    [3] = crazyVector,
+                    [4] = target.Character.HumanoidRootPart.Position,
+                    [5] = LocalPlayer.Backpack:FindFirstChild("Assault") and LocalPlayer.Backpack.Assault.GunScript_Local:FindFirstChild("MuzzleEffect"),
+                    [6] = LocalPlayer.Backpack:FindFirstChild("Assault") and LocalPlayer.Backpack.Assault.GunScript_Local:FindFirstChild("HitEffect"),
+                    [7] = 0,
+                    [8] = 0,
+                    [9] = { [1] = false },
+                    [10] = {
+                        [1] = 25,
+                        [2] = Vector3.new(100, 100, 100),
+                        [3] = BrickColor.new(29),
+                        [4] = 0.25,
+                        [5] = Enum.Material.SmoothPlastic,
+                        [6] = 0.25
+                    },
+                    [11] = true,
+                    [12] = false
+                }
+
+                Remote:FireServer(unpack(args))
+            end
+        end)
+    end
+
+    task.delay(0.5, function()
+        fireEyes()
+        shakeCamera()
+        blackFlames()
+        rolar()
+        colorRed()
+        fun()
+    end)
+end})
+
+Tabs.TT:AddButton({
+    Name = Translator:traduzir("Stop All"),
+    Description = Translator:traduzir("Stop/Shinra Tensei/Haki do Rei/ExpansÃ£o/Mangekyou"),
+    Callback = function()
+        -- Shinra Tensei
+        fireLoopActiveServer = false
+        ignoreTarget = nil
+        for _, v in ipairs(workspace:GetChildren()) do
+            if v:IsA("Part") and (v.Name == "ShinraSphere" or v.Name == "Explosao" or v.Name == "Part") and v.Material == Enum.Material.Neon then
+                v:Destroy()
+            end
+        end
+
+        -- ExpansÃ£o de DomÃ­nio
+        expansionActive = false
+        cancelExpansion = true
+        if expansionModel then
+            expansionModel:Destroy()
+            expansionModel = nil
+        end
+        if expansionSound then
+            expansionSound:Stop()
+            expansionSound:Destroy()
+            expansionSound = nil
+        end
+        if Lighting:FindFirstChild("DomainSky") then
+            Lighting.DomainSky:Destroy()
+        end
+        if originalSky and not Lighting:FindFirstChildOfClass("Sky") then
+            originalSky.Parent = Lighting
+        end
+
+        -- Haki do Rei
+        _G.HakiAtived = false
+        _G.StopHaki = true
+        if HakiSound then
+            HakiSound:Stop()
+            HakiSound:Destroy()
+            HakiSound = nil
+        end
+        if StopModel then
+            StopModel:Destroy()
+            StopModel = nil
+        end
+        for _, part in ipairs(Player.Character:GetDescendants()) do
+            if part:IsA("ParticleEmitter") and part.Texture == "rbxassetid://243098098" then
+                part:Destroy()
+            end
+        end
+
+        -- Mangekyou Sharingan
+        local cam = workspace.CurrentCamera
+        if cam:FindFirstChild("CameraShake") then
+            cam.CameraShake:Destroy()
+        end
+        if Player.PlayerGui:FindFirstChild("RotatingImageGui") then
+            Player.PlayerGui.RotatingImageGui:Destroy()
+        end
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr.Character then
+                for _, obj in ipairs(plr.Character:GetDescendants()) do
+                    if obj:IsA("ParticleEmitter") and obj.Texture == "rbxassetid://243098098" then
+                        obj:Destroy()
+                    end
+                    if obj:IsA("PointLight") and obj.Name == "StrongRedLight" then
+                        obj:Destroy()
+                    end
+                end
+            end
+        end
+
+        -- Sons gerais
+        for _, s in ipairs(workspace:GetDescendants()) do
+            if s:IsA("Sound") and (s.IsPlaying or s.Looped) then
+                s:Stop()
+                s:Destroy()
+            end
+        end
+
+        warn("✅ Todas as habilidades e efeitos foram parados e removidos!")
+    end
+})
+
+end
+do
+Tabs.TT:AddSection({Translator:traduzir("Bring Partes Update [Beta]")})
+local Players,RS,RunService,TweenService,Lighting,Workspace,TCS,UserInputService =
+    game:GetService("Players"),
+    game:GetService("ReplicatedStorage"),
+    game:GetService("RunService"),
+    game:GetService("TweenService"),
+    game:GetService("Lighting"),
+    game:GetService("Workspace"),
+    game:GetService("TextChatService"),
+    game:GetService("UserInputService")
+
+local Player = Players.LocalPlayer
+local Character,Humanoid,RootPart
+
+local function updateCharacter()
+    Character = Player.Character or Player.CharacterAdded:Wait()
+    Humanoid = Character:WaitForChild("Humanoid")
+    RootPart = Character:WaitForChild("HumanoidRootPart")
+end
+
+updateCharacter()
+Player.CharacterAdded:Connect(updateCharacter)
+
+local blackHoleActive = false
+local blackHoleModel = nil
+
+local function toggleBlackHole(v)
+    blackHoleActive = v
+    if blackHoleActive then
+        local sky = Instance.new("Sky")
+        sky.SkyboxBk="rbxassetid://8139676647"
+        sky.SkyboxDn="rbxassetid://8139676988"
+        sky.SkyboxFt="rbxassetid://8139677111"
+        sky.SkyboxLf="rbxassetid://8139677359"
+        sky.SkyboxRt="rbxassetid://8139677253"
+        sky.SkyboxUp="rbxassetid://8139676647"
+        sky.Parent = Lighting
+
+        blackHoleModel = Instance.new("Model", Workspace)
+        blackHoleModel.Name = "GargantuaBlackHole"
+
+        local singularity = Instance.new("Part", blackHoleModel)
+        singularity.Shape = Enum.PartType.Ball
+        singularity.Size = Vector3.new(80,80,80)
+        singularity.Anchored = true
+        singularity.CanCollide = false
+        singularity.Material = Enum.Material.Neon
+        singularity.Color = Color3.new(0,0,0)
+        singularity.Transparency = 0.05
