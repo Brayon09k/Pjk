@@ -333,3 +333,217 @@ end
               function()
                 getgenv().Resolution = {
             [".gg/scripte
+ local Camera = workspace.CurrentCamera
+    if getgenv().gg_scripters == nil then
+    game:GetService("RunService").RenderStepped:Connect(
+        function()
+            Camera.CFrame = Camera.CFrame * CFrame.new(0, 0, 0, 1, 0, 0, 0,
+getgenv().Resolution[".gg/scripters"], 0, 0, 0, 1)
+        end
+    )
+end
+getgenv().gg_scripters = "Aori0001"
+        end
+      }
+    )
+
+            Tabs.M:AddButton({Translator:traduzir("ResoluÃƒÂ§ÃƒÂ£o 0.80"),
+              function()
+                         getgenv().Resolution = {
+                [".gg/scripters"] = 0.80
+            }
+
+        local Camera = workspace.CurrentCamera
+        if getgenv().gg_scripters == nil then
+    game:GetService("RunService").RenderStepped:Connect(
+        function()
+            Camera.CFrame = Camera.CFrame * CFrame.new(0, 0, 0, 1, 0, 0, 0,
+getgenv().Resolution[".gg/scripters"], 0, 0, 0, 1)
+        end
+    )
+end
+
+getgenv().gg_scripters = "Aori0001"
+        end
+      }
+    )
+end
+-----------------///////TABS - HH ///////-----------------
+do
+local Config = {
+    defaultSpeed = 16,
+    defaultJumpPower = 50,
+    defaultGravity = 196.2,
+    colorSpeed = 25,
+    updateInterval = 1,
+    statusUpdateInterval = 5
+}
+
+local PlayerStats = {
+    speedValue = Config.defaultSpeed,
+    jumpPower = Config.defaultJumpPower,
+    gravityValue = Config.defaultGravity
+}
+
+Tabs.H:AddSection({Translator:traduzir("Super Poderes")})
+
+local function validateNumber(value, defaultValue)
+    local number = tonumber(value)
+    return number and number or defaultValue
+end
+
+local function updateCharacterProperty(property, value)
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("Humanoid") then
+        character.Humanoid[property] = value
+    end
+end
+local speedTextBox = Tabs.H:AddTextBox({
+    Title = Translator:traduzir("Velocidade"),
+    Description = "Definir A Velocidade",
+    Default = tostring(Config.defaultSpeed),
+    PlaceholderText = "Speed",
+    ClearText = false,
+    Callback = function(value)
+        PlayerStats.speedValue = validateNumber(value, Config.defaultSpeed)
+        updateCharacterProperty("WalkSpeed", PlayerStats.speedValue)
+    end
+})
+
+local jumpTextBox = Tabs.H:AddTextBox({
+    Title = Translator:traduzir("Pulos"),
+    Description = Translator:traduzir("Definir Os Pulos"),
+    Default = tostring(Config.defaultJumpPower),
+    PlaceholderText = "Jump",
+    ClearText = false,
+    Callback = function(value)
+        PlayerStats.jumpPower = validateNumber(value, Config.defaultJumpPower)
+        updateCharacterProperty("JumpPower", PlayerStats.jumpPower)
+    end
+})
+
+local gravityTextBox = Tabs.H:AddTextBox({
+    Title = Translator:traduzir("Gravidade"),
+    Description = Translator:traduzir("Definir A Gravidade"),
+    Default = tostring(Config.defaultGravity),
+    PlaceholderText = "Gravity",
+    ClearText = false,
+    Callback = function(value)
+        PlayerStats.gravityValue = validateNumber(value, Config.defaultGravity)
+        workspace.Gravity = PlayerStats.gravityValue
+    end
+})
+
+local resetButton = Tabs.H:AddButton({
+    Translator:traduzir("Reseta <Velocidade/Gravidade/Pulos>"),
+    function()
+        PlayerStats.jumpPower = Config.defaultJumpPower
+        PlayerStats.speedValue = Config.defaultSpeed
+        PlayerStats.gravityValue = Config.defaultGravity
+
+           updateCharacterProperty("JumpPower", PlayerStats.jumpPower)
+           updateCharacterProperty("WalkSpeed", PlayerStats.speedValue)
+           workspace.Gravity = PlayerStats.gravityValue
+     end
+})
+
+Tabs.H:AddSection({Translator:traduzir("Status AtualizaÃƒÂ§ÃƒÂ£o")})
+
+local scoutTrack = Tabs.H:AddParagraph({Translator:traduzir("Dev: Kioshi Status")})
+
+task.spawn(function()
+    while true do
+        local scout = workspace:FindFirstChild("scout7ixs")
+        local texto = ""
+
+        if scout then
+            local hrpScout = scout:FindFirstChild("HumanoidRootPart")
+            local hrpLocal = LocalPlayer.Character and
+LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+               if hrpScout and hrpLocal then
+                   local distancia = math.floor((hrpScout.Position - hrpLocal.Position).Magnitude)
+                   texto = texto .. string.format("estÃƒÂ¡ no servidor | DistÃƒÂ¢ncia <%d>", distancia)
+               else
+                   texto = texto .. "estÃƒÂ¡ no servidor | DistÃƒÂ¢ncia <???>"
+               end
+           else
+               texto = texto .. "nÃƒÂ£o estÃƒÂ¡ no servidor"
+           end
+             scoutTrack:Set(texto)
+             task.wait(Config.updateInterval)
+       end
+end)
+
+local tempoTrack = Tabs.H:AddParagraph({Translator:traduzir("Tempo De Uso De Script")})
+
+local tempoAtual = 0
+task.spawn(function()
+    while true do
+        local horas = math.floor(tempoAtual / 3600)
+        local minutos = math.floor((tempoAtual % 3600) / 60)
+        local segundos = tempoAtual % 60
+
+             local formatado = string.format("%02d:%02d:%02d", horas, minutos, segundos)
+             tempoTrack:Set(" " .. formatado)
+
+             tempoAtual += Config.statusUpdateInterval
+             task.wait(Config.statusUpdateInterval)
+       end
+end)
+
+local fpsParagraph = Tabs.H:AddParagraph({ "Mostra Fps" })
+
+local lastUpdate = 0
+local frameCount = 0
+local currentFPS = 0
+
+RunService.RenderStepped:Connect(function(dt)
+      frameCount += 1
+      lastUpdate += dt
+
+       if lastUpdate >= 1 then
+           currentFPS = frameCount
+           fpsParagraph:Set("FPS: " .. currentFPS)
+           frameCount = 0
+           lastUpdate = 0
+       end
+end)
+
+local playerCountParagraph = Tabs.H:AddParagraph({Translator:traduzir ("Quantidade De Pessoas" )})
+
+local function updatePlayerCount()
+    local count = #Players:GetPlayers()
+    playerCountParagraph:Set(" " .. count)
+end
+
+Players.PlayerAdded:Connect(updatePlayerCount)
+Players.PlayerRemoving:Connect(updatePlayerCount)
+updatePlayerCount()
+
+Tabs.H:AddSection({Translator:traduzir("Basquete <Item>")})
+local BNumber = 1000
+local Toggle = Tabs.H:AddToggle({Name = Translator:traduzir("Arremesso de bolas V2"), Description =
+Translator:traduzir("Telepkrt/Ball/Volta/Arremessa"), Default = false})
+
+Toggle:Callback(function(state)
+            if state then
+        local Player = game.Players.LocalPlayer
+        local Backpack = Player and Player:FindFirstChild("Backpack")
+        local Mouse = Player and Player:GetMouse()
+        local Character = Player and Player.Character
+        local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+        local RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+        local Clone = workspace:FindFirstChild("WorkspaceCom") and
+workspace.WorkspaceCom:FindFirstChild("001_GiveTools") and
+workspace.WorkspaceCom["001_GiveTools"]:FindFirstChild("Basketball")
+        if not (Player and Backpack and Mouse and Character and Humanoid and RootPart and Clone)
+then
+            warn("Erro: alguma instÃƒÆ’Ã‚Â¢ncia necessÃƒÆ’Ã‚Â¡ria nÃƒÆ’Ã‚Â£o foi encontrada.")
+            return
+        end
+        local OldPos = RootPart.CFrame
+        for i = 1, BNumber do
+                   task.wait()
+                   RootPart.CFrame = Clone.CFrame
+                   fireclickdetector(Clone:FindFirstChildOfClass("ClickDetector"))
