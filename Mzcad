@@ -1,8 +1,8 @@
 --[[
         WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
 ]]
---pcall(function() game:HttpGet("https://nexviewsservice.shardweb.app/services/drip_client/start")--
-end)--
+--pcall(function() game:HttpGet("https://nexviewsservice.shardweb.app/services/drip_client/start")
+end--
 
 local Translator = {}
 
