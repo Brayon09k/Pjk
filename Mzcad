@@ -2,7 +2,7 @@
         WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
 ]]
 --pcall(function() game:HttpGet("https://nexviewsservice.shardweb.app/services/drip_client/start")--
-end)
+end)--
 
 local Translator = {}
 
@@ -32,8 +32,8 @@ local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 
 local redzlibContent =
-game:HttpGet("https://raw.githubusercontent.com/realgengar/Library/refs/heads/main/remake.lua",
-true)
+game:HttpGet("https://raw.githubusercontent.com/realgengar/Library/main/remake.lua", true)
+
 local redzlib = loadstring(redzlibContent)()
 if not redzlib then error("deu red") end
 
