@@ -41,7 +41,7 @@ if not redzlib then error("deu red") end
 workspace.FallenPartsDestroyHeight = -math.huge
 
 local Window = redzlib:MakeWindow({
-    Title = "Drip Client | crÃ©dito brasileiro | Brookhaven Rp ðŸ ¡ ",
+    Title = "Mz hub",
     SaveFolder = "redz Hub | Brookhaven RP.lua"
 })
 
