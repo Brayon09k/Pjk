@@ -30,7 +30,7 @@ local Camera = workspace.CurrentCamera
 local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 
-local executor = identifyexecutor()
+local redzlibContent =
 game:HttpGet("https://raw.githubusercontent.com/realgengar/Library/main/remake.lua", true)
 
 local redzlib = loadstring(redzlibContent)()
