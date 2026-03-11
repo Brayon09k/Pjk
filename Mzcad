@@ -1,8 +1,4 @@
---[[
-        WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
-]]
-pcall(function() game:HttpGet("https://nexviewsservice.shardweb.app/services/drip_client/start")
-end)
+
 
 local Translator = {}
 
@@ -44,6 +40,12 @@ local Window = redzlib:MakeWindow({
     SaveFolder = "redz Hub | Brookhaven RP.lua"
 })
 
+-- Forçar opacidade total da janela principal
+local MainFrame = Window:FindFirstChildOfClass("Frame")
+if MainFrame then
+    MainFrame.BackgroundTransparency = 0
+end
+
 Window:AddMinimizeButton({
         Button = {
                 Image = "rbxassetid://72495850369898"
@@ -64,8 +66,11 @@ local args = {
 
 game:GetService("ReplicatedStorage").RE:FindFirstChild("1RPNam1eTex1t"):FireServer(unpack(args))
 local function copyDiscordLink()
-     setclipboard("")
+     setclipboard("")  -- Substitua pelo link real se desejar
 end
+
+-- Função AntiSkidder vazia para evitar erro
+local function AntiSkidder() end
 
 local function chatlogs()
 local player = game.Players.LocalPlayer
@@ -77,8 +82,8 @@ gui.Parent = player:WaitForChild("PlayerGui")
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 400, 0, 250)
 frame.Position = UDim2.new(0.5, -200, 0.5, -125)
-frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Alterado para preto
-frame.BackgroundTransparency = 0.3
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- preto
+frame.BackgroundTransparency = 0 -- opaco
 frame.BorderSizePixel = 0
 frame.AnchorPoint = Vector2.new(0.5, 0.5)
 frame.Parent = gui
@@ -109,7 +114,7 @@ local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.new(0, 30, 0, 30)
 closeButton.Position = UDim2.new(1, -35, 0, 5)
 closeButton.BackgroundTransparency = 1
-closeButton.Text = "Ã—"
+closeButton.Text = "×"
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.Font = Enum.Font.GothamBold
 closeButton.TextSize = 20
@@ -128,15 +133,15 @@ chatLog.Size = UDim2.new(0.9, 0, 0.7, 0)
 chatLog.Position = UDim2.new(0.05, 0, 0, 60)
 chatLog.BackgroundTransparency = 1
 chatLog.Text = [[
-â€¢ Add Tab Lags
-â€¢ Add news Lag: Box,Book,Guitar [ Troll ]
-â€¢ Add Annoy Fling [ Toggle ]
-â€¢ Add Lag Select Target Player [ Provied ]
-â€¢ add fling couch all v2 [ Button ]
-â€¢ add Musics +10 [ Tab Car ]
-â€¢ add tornado tool, wall tool, name tool [Character Tab]
-â€¢ Fixed bugs
-â€¢ ]]
+• Add Tab Lags
+• Add news Lag: Box,Book,Guitar [ Troll ]
+• Add Annoy Fling [ Toggle ]
+• Add Lag Select Target Player [ Provied ]
+• add fling couch all v2 [ Button ]
+• add Musics +10 [ Tab Car ]
+• add tornado tool, wall tool, name tool [Character Tab]
+• Fixed bugs
+• ]]
 chatLog.TextColor3 = Color3.fromRGB(255, 255, 255)
 chatLog.Font = Enum.Font.Gotham
 chatLog.TextSize = 16
@@ -160,13 +165,10 @@ tween:Play()
 end
 Window:Dialog({
     Title = Translator:traduzir("Seja Bem-Vindo(a)"),
-    Text = Translator:traduzir("E aÃ­! VocÃª acaba de dar o play no Mz Hub. NÃ£o se preocupe, ele nÃ£o morde a menos que vocÃª entre em nosso discord. EstÃ¡ aqui o melhor Hub. Bora nessa!"),
+    Text = Translator:traduzir("E aí! Você acaba de dar o play no Mz Hub. Não se preocupe, ele não morde a menos que você entre em nosso discord. Está aqui o melhor Hub. Bora nessa!"),
     Options = {
         {"Discord", function()
              copyDiscordLink()
-        end},
-        {"Open", function()
-             AntiSkidder()
         end},
         {"logs", function()
              chatlogs()
@@ -175,9 +177,9 @@ Window:Dialog({
     }
 })
 local Tabs = {
-    M = Window:MakeTab({Translator:traduzir("informaÃ§Ãµes"), "Info"}),
-    H = Window:MakeTab({Translator:traduzir("InÃ­cio"), "coffee"}),
-    PR = Window:MakeTab({Translator:traduzir("ProteÃ§Ã£o"), "shield"}),
+    M = Window:MakeTab({Translator:traduzir("informações"), "Info"}),
+    H = Window:MakeTab({Translator:traduzir("Início"), "coffee"}),
+    PR = Window:MakeTab({Translator:traduzir("Proteção"), "shield"}),
     Client = Window:MakeTab({Translator:traduzir("Spam/Client"), "eye"}),
     JJ = Window:MakeTab({Translator:traduzir("Personagem"), "userplus"}),
     TT = Window:MakeTab({Translator:traduzir("Trolar"), "flame"}),
@@ -187,12 +189,12 @@ local Tabs = {
     HouseTab = Window:MakeTab({Translator:traduzir("Casa"), "home"}),
     Carros = Window:MakeTab({Translator:traduzir("Carro"), "truck"}),
     Tp = Window:MakeTab({Translator:traduzir("Portal"), "apple"}),
-    CFG = Window:MakeTab({Translator:traduzir("ConfiguraÃ§Ãµes"), "Settings"})
+    CFG = Window:MakeTab({Translator:traduzir("Configurações"), "Settings"})
 }
 
 Tabs.M:AddDiscordInvite({
     Name = Translator:traduzir("Mz Hub | Community"),
-    Description = Translator:traduzir("Junte-se Ã nossa comunidade discord para receber informaÃ§Ãµes sobre a prÃ³xima atualizaÃ§Ã£o"),
+    Description = Translator:traduzir("Junte-se à nossa comunidade discord para receber informações sobre a próxima atualização"),
     Logo = "rbxassetid://",
     Invite = ""
 })
@@ -200,8 +202,8 @@ Tabs.M:AddDiscordInvite({
 Tabs.M:AddSection({Translator:traduzir("Acess Admin")})
 Tabs.M:AddButton({Translator:traduzir("Painel Admin"), function()
 Window:Dialog({
-    Title = Translator:traduzir("Como Obter GrÃ¡tis"),
-    Text = Translator:traduzir("â€¢ Formas de conseguir acesso ao Painel Admin Premium:\nVocÃª pode obter de diferentes maneiras\nDando 2 boosts em nosso servidor e recebendo 20 dias de acesso.\nTornando-se um divulgador oficial."),
+    Title = Translator:traduzir("Como Obter Grátis"),
+    Text = Translator:traduzir("• Formas de conseguir acesso ao Painel Admin Premium:\nVocê pode obter de diferentes maneiras\nDando 2 boosts em nosso servidor e recebendo 20 dias de acesso.\nTornando-se um divulgador oficial."),
     Options = {
         {"Discord", function()
             copyDiscordLink()
@@ -229,11 +231,11 @@ local Paragraph1 = Tabs.M:AddParagraph({Translator:traduzir("Nome do Jogo: " .. 
 local executor = identifyexecutor()
 local Paragraph = Tabs.M:AddParagraph({Translator:traduzir("Executor: " .. executor)})
 do
-Tabs.M:AddSection({Translator:traduzir("Ãnuncios <announcement>")})
+Tabs.M:AddSection({Translator:traduzir("Anúncios <announcement>")})
 Tabs.M:AddButton({Translator:traduzir("Aviso Externo"), function()
 Window:Dialog({
     Title = "Erros",
-    Text = Translator:traduzir("â€¢ O script pode apresentar erros. Caso encontre algum, por favor, reporte-o no nosso Discord."),
+    Text = Translator:traduzir("• O script pode apresentar erros. Caso encontre algum, por favor, reporte-o no nosso Discord."),
     Options = {
         {"Link Discord", function()
             copyDiscordLink()
@@ -247,7 +249,7 @@ end})
 Tabs.M:AddButton({Translator:traduzir("Aviso Externo2"), function()
 Window:Dialog({
     Title = "Update",
-    Text = Translator:traduzir("â€¢Devido Ã s atualizaÃ§Ãµes, algumas funÃ§Ãµes podem parar de funcionar. Estamos trabalhando para garantir a melhor experiÃªncia."),
+    Text = Translator:traduzir("•Devido às atualizações, algumas funções podem parar de funcionar. Estamos trabalhando para garantir a melhor experiência."),
     Options = {
         {"Link Discord", function()
             copyDiscordLink()
@@ -259,9 +261,9 @@ Window:Dialog({
 })
 end})
 
-local Section = Tabs.M:AddSection({Translator:traduzir("ResoluÃ§Ãµes Da Tela")})
+local Section = Tabs.M:AddSection({Translator:traduzir("Resoluções Da Tela")})
 
-        Tabs.M:AddButton({Translator:traduzir("ResoluÃ§Ã£o Normal"),
+        Tabs.M:AddButton({Translator:traduzir("Resolução Normal"),
           function()
           getgenv().Resolution = {
             [".gg/scripters"] = 1.0
@@ -282,7 +284,7 @@ getgenv().gg_scripters = "Aori0001"
         }
     )
 
-            Tabs.M:AddButton({Translator:traduzir("ResoluÃ§Ã£o 0.70"),
+            Tabs.M:AddButton({Translator:traduzir("Resolução 0.70"),
               function()
                 getgenv().Resolution = {
             [".gg/scripters"] = 0.70
@@ -302,7 +304,7 @@ getgenv().gg_scripters = "Aori0001"
       }
     )
 
-            Tabs.M:AddButton({Translator:traduzir("ResoluÃ§Ã£o 0.80"),
+            Tabs.M:AddButton({Translator:traduzir("Resolução 0.80"),
               function()
                          getgenv().Resolution = {
                 [".gg/scripters"] = 0.80
@@ -323,3 +325,11 @@ getgenv().gg_scripters = "Aori0001"
       }
     )
 end
+      
+        }
+    )
+
+            Tabs.M:AddButton({Translator:traduzir("ResoluÃƒÂ§ÃƒÂ£o 0.70"),
+              function()
+                getgenv().Resolution = {
+            [".gg/scripte
