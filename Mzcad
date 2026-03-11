@@ -4033,3 +4033,531 @@ local function toggleBlackHole(v)
         singularity.Material = Enum.Material.Neon
         singularity.Color = Color3.new(0,0,0)
         singularity.Transparency = 0.05
+        local diskLayers = {}
+        for i=1,7 do
+            local disk = Instance.new("Part", blackHoleModel)
+            disk.Shape = Enum.PartType.Cylinder
+            disk.Size = Vector3.new(8,200+(i*50),200+(i*50))
+            disk.Anchored = true
+            disk.CanCollide = false
+            disk.Material = Enum.Material.Neon
+            disk.Color = Color3.fromHSV((i*30)%360/360*0.15,1,1)
+            disk.Transparency = 0.3+(i*0.08)
+            table.insert(diskLayers,disk)
+            local light = Instance.new("PointLight",disk)
+            light.Color = disk.Color
+            light.Brightness = 8-i
+            light.Range = 300+(i*50)
+        end
+
+        local centralLight = Instance.new("PointLight", singularity)
+        centralLight.Color = Color3.fromRGB(255,100,0)
+        centralLight.Brightness = 15
+        centralLight.Range = 800
+
+        local attachment = Instance.new("Attachment", singularity)
+
+        local function applyForce(v)
+            if v:IsA("Part") and not v.Anchored and not v.Parent:FindFirstChild("Humanoid") and v.Parent ~= blackHoleModel then
+                for _,force in pairs(v:GetChildren()) do
+                    if force:IsA("BodyAngularVelocity") or force:IsA("BodyForce") or force:IsA("BodyVelocity") or force:IsA("AlignPosition") or force:IsA("Torque") then
+                        force:Destroy()
+                    end
+                end
+                v.CanCollide = false
+                local torque = Instance.new("Torque", v)
+                local align = Instance.new("AlignPosition", v)
+                local att2 = Instance.new("Attachment", v)
+                torque.Torque = Vector3.new(15000000,15000000,15000000)
+                torque.Attachment0 = att2
+                align.MaxForce = math.huge
+                align.MaxVelocity = math.huge
+                align.Responsiveness = 400
+                align.Attachment0 = att2
+                align.Attachment1 = attachment
+
+                task.spawn(function()
+                    local startTime = tick()
+                    local orbitRadius = math.random(40,120)
+                    local orbitSpeed = math.sqrt(1000000/orbitRadius)
+                    while align.Parent and blackHoleActive and blackHoleModel.Parent do
+                        local elapsed = tick()-startTime
+                        local angle = elapsed*orbitSpeed
+                        local heightOsc = math.sin(elapsed)*orbitRadius*0.3
+                        orbitRadius = math.max(30,orbitRadius-0.02)
+                        local targetPos = singularity.Position+Vector3.new(math.cos(angle)*orbitRadius,heightOsc,math.sin(angle)*orbitRadius)
+                        attachment.WorldCFrame = CFrame.new(targetPos)
+                        RunService.RenderStepped:Wait()
+                    end
+                end)
+            end
+        end
+
+        task.spawn(function()
+            for i,v in pairs(Workspace:GetDescendants()) do
+                applyForce(v)
+                if i%15==0 then task.wait() end
+            end
+        end)
+
+        Workspace.DescendantAdded:Connect(function(v)
+            if blackHoleActive then
+                task.wait(0.1)
+                applyForce(v)
+            end
+        end)
+
+        task.spawn(function()
+            while blackHoleActive and blackHoleModel.Parent and Player.Character do
+                local char = Player.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local targetPos = char.HumanoidRootPart.Position+Vector3.new(0,50,30)
+                    singularity.Position = singularity.Position:lerp(targetPos,0.05)
+                    for _,disk in pairs(diskLayers) do
+                        disk.Position = singularity.Position
+                    end
+                end
+                RunService.Heartbeat:Wait()
+            end
+        end)
+
+        task.spawn(function()
+            local rotationSpeed, pulseTime = 0,0
+            while blackHoleActive and blackHoleModel.Parent do
+                rotationSpeed += math.rad(1.5)
+                pulseTime += 0.02
+                for i,disk in pairs(diskLayers) do
+                    if disk and disk.Parent then
+                        local diskSpeed = rotationSpeed*(1+i*0.2)
+                        disk.CFrame = CFrame.new(singularity.Position)*CFrame.Angles(0,0,diskSpeed)
+                    end
+                end
+                if centralLight then
+                    local lightPulse = math.sin(pulseTime*4)*0.3+1
+                    centralLight.Brightness = 15*lightPulse
+                end
+                RunService.RenderStepped:Wait()
+            end
+        end)
+    else
+        if blackHoleModel then
+            blackHoleModel:Destroy()
+            blackHoleModel = nil
+        end
+    end
+end
+
+local ToggleBlackHole = Tabs.TT:AddToggle({
+    Name = "Gargantua Black Hole",
+    Description = "Núcleo blackHole Hacking!!!",
+    Default = false
+})
+ToggleBlackHole:Callback(function(Value)
+    toggleBlackHole(Value)
+end)
+
+local Button = Tabs.TT:AddButton({Translator:traduzir("Puxa Partes Gui"), function()
+  local Gui = Instance.new("ScreenGui")
+local Main = Instance.new("Frame")
+local MainCorner = Instance.new("UICorner")
+local MainStroke = Instance.new("UIStroke")
+local Dropdown = Instance.new("TextButton")
+local DropdownCorner = Instance.new("UICorner")
+local DropdownStroke = Instance.new("UIStroke")
+local DropdownIcon = Instance.new("TextLabel")
+local UITextSizeConstraint = Instance.new("UITextSizeConstraint")
+local DropdownFrame = Instance.new("ScrollingFrame")
+local DropdownFrameCorner = Instance.new("UICorner")
+local DropdownFrameStroke = Instance.new("UIStroke")
+local DropdownList = Instance.new("UIListLayout")
+local Label = Instance.new("TextLabel")
+local LabelCorner = Instance.new("UICorner")
+local LabelStroke = Instance.new("UIStroke")
+local UITextSizeConstraint_2 = Instance.new("UITextSizeConstraint")
+local Button = Instance.new("TextButton")
+local ButtonCorner = Instance.new("UICorner")
+local ButtonStroke = Instance.new("UIStroke")
+local UITextSizeConstraint_3 = Instance.new("UITextSizeConstraint")
+
+Gui.Name = "Gui"
+Gui.Parent = gethui()
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+Main.Name = "Main"
+Main.Parent = Gui
+Main.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+Main.BorderSizePixel = 0
+Main.Position = UDim2.new(0.335954279, 0, 0.542361975, 0)
+Main.Size = UDim2.new(0.240350261, 0, 0.200000000, 0)
+Main.Active = true
+Main.Draggable = true
+
+MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.Parent = Main
+
+MainStroke.Color = Color3.fromRGB(85, 170, 255)
+MainStroke.Thickness = 2
+MainStroke.Parent = Main
+
+Dropdown.Name = "Dropdown"
+Dropdown.Parent = Main
+Dropdown.BackgroundColor3 = Color3.fromRGB(65, 65, 75)
+Dropdown.BorderSizePixel = 0
+Dropdown.Position = UDim2.new(0.08, 0, 0.25, 0)
+Dropdown.Size = UDim2.new(0.84, 0, 0.25, 0)
+Dropdown.FontFace = Font.new("rbxasset://fonts/families/Nunito.json", Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+Dropdown.Text = "Selecionar Jogador"
+Dropdown.TextColor3 = Color3.fromRGB(220, 220, 220)
+Dropdown.TextScaled = true
+Dropdown.TextSize = 18
+Dropdown.TextWrapped = true
+Dropdown.TextXAlignment = Enum.TextXAlignment.Left
+
+DropdownCorner.CornerRadius = UDim.new(0, 8)
+DropdownCorner.Parent = Dropdown
+
+DropdownStroke.Color = Color3.fromRGB(100, 100, 120)
+DropdownStroke.Thickness = 1
+DropdownStroke.Parent = Dropdown
+
+DropdownIcon.Name = "DropdownIcon"
+DropdownIcon.Parent = Dropdown
+DropdownIcon.BackgroundTransparency = 1
+DropdownIcon.Position = UDim2.new(0.85, 0, 0, 0)
+DropdownIcon.Size = UDim2.new(0.15, 0, 1, 0)
+DropdownIcon.Font = Enum.Font.Nunito
+DropdownIcon.Text = "▼"
+DropdownIcon.TextColor3 = Color3.fromRGB(150, 150, 150)
+DropdownIcon.TextScaled = true
+DropdownIcon.TextSize = 14
+
+local DropdownPadding = Instance.new("UIPadding")
+DropdownPadding.PaddingLeft = UDim.new(0, 10)
+DropdownPadding.Parent = Dropdown
+UITextSizeConstraint.Parent = Dropdown
+UITextSizeConstraint.MaxTextSize = 18
+
+DropdownFrame.Name = "DropdownFrame"
+DropdownFrame.Parent = Main
+DropdownFrame.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+DropdownFrame.BorderSizePixel = 0
+DropdownFrame.Position = UDim2.new(0.08, 0, 0.51, 0)
+DropdownFrame.Size = UDim2.new(0.84, 0, 0, 0)
+DropdownFrame.Visible = false
+DropdownFrame.ScrollBarThickness = 6
+DropdownFrame.ScrollBarImageColor3 = Color3.fromRGB(85, 170, 255)
+
+DropdownFrameCorner.CornerRadius = UDim.new(0, 8)
+DropdownFrameCorner.Parent = DropdownFrame
+
+DropdownFrameStroke.Color = Color3.fromRGB(100, 100, 120)
+DropdownFrameStroke.Thickness = 1
+DropdownFrameStroke.Parent = DropdownFrame
+
+DropdownList.Parent = DropdownFrame
+DropdownList.SortOrder = Enum.SortOrder.LayoutOrder
+DropdownList.Padding = UDim.new(0, 2)
+
+Label.Name = "Label"
+Label.Parent = Main
+Label.BackgroundColor3 = Color3.fromRGB(85, 170, 255)
+Label.BorderSizePixel = 0
+Label.Size = UDim2.new(1, 0, 0.18, 0)
+Label.FontFace = Font.new("rbxasset://fonts/families/Nunito.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+Label.Text = "Bring Parts"
+Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+Label.TextScaled = true
+Label.TextSize = 16
+Label.TextWrapped = true
+
+LabelCorner.CornerRadius = UDim.new(0, 12)
+LabelCorner.Parent = Label
+
+LabelStroke.Color = Color3.fromRGB(65, 140, 215)
+LabelStroke.Thickness = 1
+LabelStroke.Parent = Label
+
+UITextSizeConstraint_2.Parent = Label
+UITextSizeConstraint_2.MaxTextSize = 16
+
+Button.Name = "Button"
+Button.Parent = Main
+Button.BackgroundColor3 = Color3.fromRGB(65, 65, 75)
+Button.BorderSizePixel = 0
+Button.Position = UDim2.new(0.15, 0, 0.72, 0)
+Button.Size = UDim2.new(0.7, 0, 0.22, 0)
+Button.FontFace = Font.new("rbxasset://fonts/families/Nunito.json", Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+Button.Text = "Bring | Off"
+Button.TextColor3 = Color3.fromRGB(220, 220, 220)
+Button.TextScaled = true
+Button.TextSize = 20
+Button.TextWrapped = true
+
+ButtonCorner.CornerRadius = UDim.new(0, 8)
+ButtonCorner.Parent = Button
+
+ButtonStroke.Color = Color3.fromRGB(100, 100, 120)
+ButtonStroke.Thickness = 1
+ButtonStroke.Parent = Button
+
+UITextSizeConstraint_3.Parent = Button
+UITextSizeConstraint_3.MaxTextSize = 20
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+
+local character
+local humanoidRootPart
+local selectedPlayer = nil
+local dropdownOpen = false
+local playerButtons = {}
+
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+
+local function createPlayerButton(player)
+    local playerButton = Instance.new("TextButton")
+    local playerButtonCorner = Instance.new("UICorner")
+    local playerButtonPadding = Instance.new("UIPadding")
+
+    playerButton.Name = player.Name
+    playerButton.Parent = DropdownFrame
+    playerButton.BackgroundColor3 = Color3.fromRGB(65, 65, 75)
+    playerButton.BorderSizePixel = 0
+    playerButton.Size = UDim2.new(1, -10, 0, 35)
+    playerButton.FontFace = Font.new("rbxasset://fonts/families/Nunito.json", Enum.FontWeight.Medium, Enum.FontStyle.Normal)
+    playerButton.Text = player.DisplayName .. " (@" .. player.Name .. ")"
+    playerButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    playerButton.TextSize = 14
+    playerButton.TextXAlignment = Enum.TextXAlignment.Left
+
+    playerButtonCorner.CornerRadius = UDim.new(0, 6)
+    playerButtonCorner.Parent = playerButton
+
+    playerButtonPadding.PaddingLeft = UDim.new(0, 10)
+    playerButtonPadding.Parent = playerButton
+
+    playerButton.MouseEnter:Connect(function()
+        local hoverTween = TweenService:Create(playerButton, tweenInfo, {BackgroundColor3 = Color3.fromRGB(85, 170, 255)})
+        hoverTween:Play()
+    end)
+
+    playerButton.MouseLeave:Connect(function()
+        local leaveTween = TweenService:Create(playerButton, tweenInfo, {BackgroundColor3 = Color3.fromRGB(65, 65, 75)})
+        leaveTween:Play()
+    end)
+
+    playerButton.MouseButton1Click:Connect(function()
+        selectedPlayer = player
+        Dropdown.Text = player.DisplayName .. " (@" .. player.Name .. ")"
+
+        dropdownOpen = false
+        DropdownIcon.Text = "▼"
+        local closeTween = TweenService:Create(DropdownFrame, tweenInfo, {Size = UDim2.new(0.84, 0, 0, 0)})
+        closeTween:Play()
+        closeTween.Completed:Wait()
+        DropdownFrame.Visible = false
+    end)
+
+    return playerButton
+end
+
+local function updatePlayerList()
+    for _, button in pairs(playerButtons) do
+        button:Destroy()
+    end
+    playerButtons = {}
+    local players = Players:GetPlayers()
+    for _, player in pairs(players) do
+        if player ~= LocalPlayer then
+            local button = createPlayerButton(player)
+            table.insert(playerButtons, button)
+        end
+    end
+    local totalHeight = math.min(#playerButtons * 37 + 10, 200)
+    DropdownFrame.CanvasSize = UDim2.new(0, 0, 0, #playerButtons * 37 + 10)
+end
+
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
+
+updatePlayerList()
+
+Dropdown.MouseButton1Click:Connect(function()
+    dropdownOpen = not dropdownOpen
+
+    if dropdownOpen then
+        updatePlayerList()
+        DropdownFrame.Visible = true
+        DropdownIcon.Text = "▲"
+        local openTween = TweenService:Create(DropdownFrame, tweenInfo, {Size = UDim2.new(0.84, 0, 0, math.min(#playerButtons * 37 + 10, 200))})
+        openTween:Play()
+    else
+        DropdownIcon.Text = "▼"
+        local closeTween = TweenService:Create(DropdownFrame, tweenInfo, {Size = UDim2.new(0.84, 0, 0, 0)})
+        closeTween:Play()
+        closeTween.Completed:Wait()
+        DropdownFrame.Visible = false
+    end
+end)
+
+mainStatus = true
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    if input.KeyCode == Enum.KeyCode.RightControl and not gameProcessedEvent then
+        mainStatus = not mainStatus
+        if mainStatus then
+            Main.Visible = true
+            local showTween = TweenService:Create(Main, tweenInfo, {BackgroundTransparency = 0})
+            showTween:Play()
+        else
+            local hideTween = TweenService:Create(Main, tweenInfo, {BackgroundTransparency = 1})
+            hideTween:Play()
+            hideTween.Completed:Wait()
+            Main.Visible = false
+        end
+    end
+end)
+
+local Folder = Instance.new("Folder", Workspace)
+local Part = Instance.new("Part", Folder)
+local Attachment1 = Instance.new("Attachment", Part)
+Part.Anchored = true
+Part.CanCollide = false
+Part.Transparency = 1
+
+if not getgenv().Network then
+    getgenv().Network = {
+        BaseParts = {},
+        Velocity = Vector3.new(14.46262424, 14.46262424, 14.46262424)
+    }
+
+    Network.RetainPart = function(Part)
+        if Part:IsA("BasePart") and Part:IsDescendantOf(Workspace) then
+            table.insert(Network.BaseParts, Part)
+            Part.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
+            Part.CanCollide = false
+        end
+    end
+
+    local function EnablePartControl()
+        LocalPlayer.ReplicationFocus = Workspace
+        RunService.Heartbeat:Connect(function()
+            sethiddenproperty(LocalPlayer, "SimulationRadius", math.huge)
+            for _, Part in pairs(Network.BaseParts) do
+                if Part:IsDescendantOf(Workspace) then
+                    Part.Velocity = Network.Velocity
+                end
+            end
+        end)
+    end
+
+    EnablePartControl()
+end
+
+local function ForcePart(v)
+    if v:IsA("BasePart") and not v.Anchored and not v.Parent:FindFirstChildOfClass("Humanoid") and not v.Parent:FindFirstChild("Head") and v.Name ~= "Handle" then
+        for _, x in ipairs(v:GetChildren()) do
+            if x:IsA("BodyMover") or x:IsA("RocketPropulsion") then
+                x:Destroy()
+            end
+        end
+        if v:FindFirstChild("Attachment") then
+            v:FindFirstChild("Attachment"):Destroy()
+        end
+        if v:FindFirstChild("AlignPosition") then
+            v:FindFirstChild("AlignPosition"):Destroy()
+        end
+        if v:FindFirstChild("Torque") then
+            v:FindFirstChild("Torque"):Destroy()
+        end
+        v.CanCollide = false
+        local Torque = Instance.new("Torque", v)
+        Torque.Torque = Vector3.new(100000, 100000, 100000)
+        local AlignPosition = Instance.new("AlignPosition", v)
+        local Attachment2 = Instance.new("Attachment", v)
+        Torque.Attachment0 = Attachment2
+        AlignPosition.MaxForce = math.huge
+        AlignPosition.MaxVelocity = math.huge
+        AlignPosition.Responsiveness = 200
+        AlignPosition.Attachment0 = Attachment2
+        AlignPosition.Attachment1 = Attachment1
+    end
+end
+
+local blackHoleActive = false
+local DescendantAddedConnection
+
+local function toggleBlackHole()
+    blackHoleActive = not blackHoleActive
+    if blackHoleActive then
+        Button.Text = "Bring Parts | On"
+        Button.BackgroundColor3 = Color3.fromRGB(85, 170, 255)
+        ButtonStroke.Color = Color3.fromRGB(65, 140, 215)
+
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            ForcePart(v)
+        end
+
+        DescendantAddedConnection = Workspace.DescendantAdded:Connect(function(v)
+            if blackHoleActive then
+                ForcePart(v)
+            end
+        end)
+
+        spawn(function()
+            while blackHoleActive and RunService.RenderStepped:Wait() do
+                Attachment1.WorldCFrame = humanoidRootPart.CFrame
+            end
+        end)
+    else
+        Button.Text = "Bring Parts | Off"
+        Button.BackgroundColor3 = Color3.fromRGB(65, 65, 75)
+        ButtonStroke.Color = Color3.fromRGB(100, 100, 120)
+
+        if DescendantAddedConnection then
+            DescendantAddedConnection:Disconnect()
+        end
+    end
+end
+
+Button.MouseButton1Click:Connect(function()
+    if selectedPlayer then
+        character = selectedPlayer.Character or selectedPlayer.CharacterAdded:Wait()
+        humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+        toggleBlackHole()
+    else
+        local errorTween = TweenService:Create(Dropdown, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(255, 80, 80)})
+        errorTween:Play()
+        errorTween.Completed:Wait()
+        local resetTween = TweenService:Create(Dropdown, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(65, 65, 75)})
+        resetTween:Play()
+    end
+end)
+
+Button.MouseEnter:Connect(function()
+    if not blackHoleActive then
+        local hoverTween = TweenService:Create(Button, tweenInfo, {BackgroundColor3 = Color3.fromRGB(75, 75, 85)})
+        hoverTween:Play()
+    end
+end)
+
+Button.MouseLeave:Connect(function()
+    if not blackHoleActive then
+        local leaveTween = TweenService:Create(Button, tweenInfo, {BackgroundColor3 = Color3.fromRGB(65, 65, 75)})
+        leaveTween:Play()
+    end
+end)
+
+Dropdown.MouseEnter:Connect(function()
+    local hoverTween = TweenService:Create(Dropdown, tweenInfo, {BackgroundColor3 = Color3.fromRGB(75, 75, 85)})
+    hoverTween:Play()
+end)
+
+Dropdown.MouseLeave:Connect(function()
+    local leaveTween = TweenService:Create(Dropdown, tweenInfo, {BackgroundColor3 = Color3.fromRGB(65, 65, 75)})
+    leaveTween:Play()
+end)
+end})
+end
