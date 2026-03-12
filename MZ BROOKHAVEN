@@ -10,7 +10,7 @@ local Camera = workspace.CurrentCamera
 
 -- Nome e bio
 local NOME = "MZ"
-local BIO = "MZ on top"
+local BIO = "{MZ on script}"
 
 local function setRolePlayName(name)
     local remote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1RPNam1eTex1t")
