@@ -23,6 +23,22 @@ end
 setRolePlayName(NOME)
 setRolePlayBio(BIO)
 
+-- ===== INÍCIO DO CÓDIGO RGB =====
+spawn(function()
+    local colorRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1RPNam1eColo1r")
+    if colorRemote then
+        while true do
+            local cor = Color3.new(math.random(), math.random(), math.random())
+            pcall(function() colorRemote:FireServer("PickingRPNameColor", cor) end)
+            pcall(function() colorRemote:FireServer("PickingRPBioColor", cor) end)
+            wait(0.5)
+        end
+    end
+end)
+-- ===== FIM DO CÓDIGO RGB =====
+
+-- Resto do script...
+
 -- Interface gráfica
 local gui = Instance.new("ScreenGui")
 gui.Name = "MzHub"
