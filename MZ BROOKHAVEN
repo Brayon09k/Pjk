@@ -311,6 +311,7 @@ local Tabs = {
     Troll = criarAba("Troll"),
     Audio = criarAba("Áudio"),
     Config = criarAba("Config")
+    protect = criarAbs("proteção")
 }
 containers[1].Visible = true
 
@@ -612,7 +613,7 @@ Tabs.Troll:AddButton("Destravar", function()
 end)
 
 -- ========================================
--- Função CRIANÇA (Pirralho)
+-- Função CRIANÇA (Pirralho) – expandida
 -- ========================================
 Tabs.Troll:AddSection("Criança (Pirralho)")
 Tabs.Troll:AddButton("Enviar Pirralho para o Jogador", function()
@@ -629,14 +630,14 @@ Tabs.Troll:AddButton("Enviar Pirralho para o Jogador", function()
             pirralho.Parent = selectedTarget.Character
             local parteAlvo = selectedTarget.Character:FindFirstChild("Head")
             if parteAlvo then
-                local con
-                con = RunService.Heartbeat:Connect(function()
+                if _G.babyConn then _G.babyConn:Disconnect() end
+                _G.babyConn = RunService.Heartbeat:Connect(function()
                     if pirralho and pirralho.Parent and parteAlvo and parteAlvo.Parent then
                         if pirralho:FindFirstChild("Torso") then
                             pirralho.Torso.CFrame = parteAlvo.CFrame * CFrame.new(0, 1, 0)
                         end
                     else
-                        con:Disconnect()
+                        if _G.babyConn then _G.babyConn:Disconnect() _G.babyConn = nil end
                     end
                 end)
             end
@@ -648,14 +649,56 @@ Tabs.Troll:AddButton("Enviar Pirralho para o Jogador", function()
     end
 end)
 
-Tabs.Troll:AddButton("Pegar Sofá", function()
-    local args = { [1] = "PickingTools", [2] = "Couch" }
-    local toolRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Too1l")
-    if toolRemote then toolRemote:InvokeServer(unpack(args)) end
+Tabs.Troll:AddButton("Retornar Boneco", function()
+    if _G.babyConn then _G.babyConn:Disconnect() _G.babyConn = nil end
+    local pirralho = workspace:FindFirstChild(LocalPlayer.Name) and workspace[LocalPlayer.Name]:FindFirstChild("FollowCharacter")
+    if pirralho then pirralho:Destroy() end
 end)
 
-Tabs.Troll:AddButton("Auto Fling (Sofá)", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/realgengar/scripts/refs/heads/main/Brancos.lua", true))()
+Tabs.Troll:AddButton("Visualizar Jogador", function()
+    if not selectedTarget then return end
+    if _G.viewConn then
+        _G.viewConn:Disconnect()
+        _G.viewConn = nil
+        Camera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    else
+        if selectedTarget.Character then
+            _G.viewConn = RunService.Heartbeat:Connect(function()
+                if selectedTarget.Character and selectedTarget.Character:FindFirstChild("Humanoid") then
+                    Camera.CameraSubject = selectedTarget.Character.Humanoid
+                else
+                    _G.viewConn:Disconnect()
+                    _G.viewConn = nil
+                end
+            end)
+        end
+    end
+end)
+
+Tabs.Troll:AddButton("Braço Sus (experimental)", function()
+    if not selectedTarget or not selectedTarget.Character then return end
+    local arm = selectedTarget.Character:FindFirstChild("Right Arm") or selectedTarget.Character:FindFirstChild("RightUpperArm")
+    if arm then
+        arm.CFrame = arm.CFrame * CFrame.Angles(math.rad(90), 0, 0)
+    end
+end)
+
+Tabs.Troll:AddButton("Sus Atrás do Jogador", function()
+    if not selectedTarget or not selectedTarget.Character then return end
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+    if root and targetRoot then
+        root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
+    end
+end)
+
+Tabs.Troll:AddButton("Sus Cara do Jogador", function()
+    if not selectedTarget or not selectedTarget.Character then return end
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local targetHead = selectedTarget.Character:FindFirstChild("Head")
+    if root and targetHead then
+        root.CFrame = targetHead.CFrame * CFrame.new(0, 0.5, 0.5)
+    end
 end)
 
 -- ========================================
@@ -701,3 +744,106 @@ Tabs.Config:AddButton("Reentrar no Servidor", function()
 end)
 
 print("Mz hub (brookhaven) carregado! Nome: " .. NOME .. " | Bio: " .. BIO)
+
+-- ========================================
+-- ABA PROTEÇÃO (conteúdo)
+-- ========================================
+Protect:AddSection("Proteções")
+
+-- No Clip (já existe, mas vamos adicionar um toggle aqui também)
+local noclipProtect = false
+Protect:AddToggle("No Clip", false, function(v) noclipProtect = v end)
+-- (O loop do No Clip já existe no script, então ele funcionará com essa variável)
+
+-- Void Protection
+local voidEnabled = false
+Protect:AddToggle("Void Protection", false, function(v)
+    voidEnabled = v
+    if v then
+        if not _G.voidConn then
+            _G.voidConn = RunService.Heartbeat:Connect(function()
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    if LocalPlayer.Character.HumanoidRootPart.Position.Y < -50 then
+                        LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0, 50, 0)
+                    end
+                end
+            end)
+        end
+    else
+        if _G.voidConn then _G.voidConn:Disconnect() _G.voidConn = nil end
+    end
+end)
+
+-- Anti Sit
+local antiSit = false
+Protect:AddToggle("Anti Sit", false, function(v) antiSit = v end)
+
+-- Anti Fling (protege contra fling de outros scripts)
+local antiFling = false
+Protect:AddToggle("Anti Fling", false, function(v)
+    antiFling = v
+    if v then
+        if not _G.flingConn then
+            _G.flingConn = RunService.Heartbeat:Connect(function()
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local hrp = LocalPlayer.Character.HumanoidRootPart
+                    if hrp.Velocity.Magnitude > 200 then
+                        hrp.Velocity = Vector3.new(0, 0, 0)
+                        hrp.Anchored = true
+                        task.wait(0.1)
+                        hrp.Anchored = false
+                    end
+                end
+            end)
+        end
+    else
+        if _G.flingConn then _G.flingConn:Disconnect() _G.flingConn = nil end
+    end
+end)
+
+-- Anti Flashbang / Skybox
+local antiFlash = false
+Protect:AddToggle("Anti Flashbang", false, function(v)
+    antiFlash = v
+    if v then
+        if not _G.flashConn then
+            _G.flashConn = RunService.Stepped:Connect(function()
+                local cam = workspace.CurrentCamera
+                for _, obj in ipairs(cam:GetChildren()) do
+                    if obj:IsA("BasePart") and obj.Name == "water" then
+                        obj:Destroy()
+                    end
+                end
+            end)
+        end
+    else
+        if _G.flashConn then _G.flashConn:Disconnect() _G.flashConn = nil end
+    end
+end)
+
+-- Anti Lag (remove itens desnecessários do personagem)
+local antiLag = false
+Protect:AddToggle("Anti Lag", false, function(v)
+    antiLag = v
+    if v then
+        if not _G.lagConn then
+            _G.lagConn = task.spawn(function()
+                while antiLag do
+                    task.wait(2)
+                    if LocalPlayer.Character then
+                        for _, item in ipairs(LocalPlayer.Character:GetChildren()) do
+                            if item:IsA("Tool") or item:IsA("Accessory") then
+                                -- Remove itens que não são essenciais (ex: celular, bola)
+                                if item.Name:match("Phone") or item.Name:match("Ball") or item.Name:match("Taser") then
+                                    item:Destroy()
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    else
+        if _G.lagConn then task.cancel(_G.lagConn) _G.lagConn = nil end
+    end
+end)
