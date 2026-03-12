@@ -311,7 +311,7 @@ local Tabs = {
     Troll = criarAba("Troll"),
     Audio = criarAba("Áudio"),
     Config = criarAba("Config")
-    protect = criarAbs("proteção")
+    protect = criarAbs("Proteção")
 }
 containers[1].Visible = true
 
