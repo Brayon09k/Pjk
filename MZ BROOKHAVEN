@@ -587,6 +587,84 @@ Tabs.Troll:AddButton("Fling com Bola", function()
     if not ball then
         local args = { [1] = "PickingTools", [2] = "SoccerBall" }
         local toolRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Too1l")
+-- ========================================
+-- ABA TROLL (com dropdown e função Criança)
+-- ========================================
+Tabs.Troll:AddSection("Selecionar Jogador")
+local trollDropdownFrame = Instance.new("Frame")
+trollDropdownFrame.Size = UDim2.new(1, -10, 0, 30)
+trollDropdownFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+trollDropdownFrame.BackgroundTransparency = 0.1
+trollDropdownFrame.Parent = Tabs.Troll.container
+Instance.new("UICorner", trollDropdownFrame).CornerRadius = UDim.new(0, 6)
+
+local trollDropdownBtn = Instance.new("TextButton")
+trollDropdownBtn.Size = UDim2.new(1, 0, 1, 0)
+trollDropdownBtn.BackgroundTransparency = 1
+trollDropdownBtn.Text = "Selecione um jogador"
+trollDropdownBtn.TextColor3 = Color3.new(1, 1, 1)
+trollDropdownBtn.Font = Enum.Font.Gotham
+trollDropdownBtn.TextSize = 14
+trollDropdownBtn.Parent = trollDropdownFrame
+
+local trollDropdownList = Instance.new("ScrollingFrame")
+trollDropdownList.Size = UDim2.new(1, 0, 0, 120)
+trollDropdownList.Position = UDim2.new(0, 0, 1, 0)
+trollDropdownList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+trollDropdownList.BackgroundTransparency = 0.1
+trollDropdownList.Visible = false
+trollDropdownList.Parent = trollDropdownFrame
+
+local selectedTarget = nil
+
+local function refreshTrollDropdown()
+    for _, v in ipairs(trollDropdownList:GetChildren()) do
+        if v:IsA("TextButton") then v:Destroy() end
+    end
+    for _, nome in ipairs(playerList) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 25)
+        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        btn.BackgroundTransparency = 0.1
+        btn.Text = nome
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 12
+        btn.Parent = trollDropdownList
+        btn.MouseButton1Click:Connect(function()
+            selectedTarget = Players:FindFirstChild(nome)
+            trollDropdownBtn.Text = nome
+            trollDropdownList.Visible = false
+        end)
+    end
+end
+
+trollDropdownBtn.MouseButton1Click:Connect(function()
+    refreshTrollDropdown()
+    trollDropdownList.Visible = not trollDropdownList.Visible
+end)
+
+Tabs.Troll:AddButton("Atualizar Lista", function()
+    atualizarLista()
+    refreshTrollDropdown()
+end)
+
+Tabs.Troll:AddSection("Ações com o Jogador")
+Tabs.Troll:AddButton("Teleportar para Jogador", function()
+    if selectedTarget and selectedTarget.Character then
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame
+        end
+    end
+end)
+
+Tabs.Troll:AddButton("Fling com Bola", function()
+    if not selectedTarget then return end
+    local ball = workspace:FindFirstChild("WorkspaceCom") and workspace.WorkspaceCom:FindFirstChild("001_SoccerBalls"):FindFirstChild("Soccer"..LocalPlayer.Name)
+    if not ball then
+        local args = { [1] = "PickingTools", [2] = "SoccerBall" }
+        local toolRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Too1l")
         if toolRemote then toolRemote:InvokeServer(unpack(args)) end
         task.wait(1)
         ball = workspace:FindFirstChild("WorkspaceCom") and workspace.WorkspaceCom:FindFirstChild("001_SoccerBalls"):FindFirstChild("Soccer"..LocalPlayer.Name)
@@ -701,6 +779,7 @@ Tabs.Troll:AddButton("Sus Cara do Jogador", function()
         root.CFrame = targetHead.CFrame * CFrame.new(0, 0.5, 0.5)
     end
 end)
+
 
 -- ========================================
 -- ABA ÁUDIO
