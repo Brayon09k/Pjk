@@ -657,11 +657,51 @@ Tabs.Troll:AddButton("Retornar Boneco", function()
     if pirralho then pirralho:Destroy() end
 end)
 
-trollDropdownBtn.MouseButton1Click:Connect(function()
-    refreshTrollDropdown()
-    trollDropdownList.Visible = not trollDropdownList.Visible
+Tabs.Troll:AddButton("Visualizar Jogador", function()
+    if not selectedTarget then return end
+    if _G.viewConn then
+        _G.viewConn:Disconnect()
+        _G.viewConn = nil
+        Camera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    else
+        if selectedTarget.Character then
+            _G.viewConn = RunService.Heartbeat:Connect(function()
+                if selectedTarget.Character and selectedTarget.Character:FindFirstChild("Humanoid") then
+                    Camera.CameraSubject = selectedTarget.Character.Humanoid
+                else
+                    _G.viewConn:Disconnect()
+                    _G.viewConn = nil
+                end
+            end)
+        end
+    end
 end)
 
+Tabs.Troll:AddButton("Braço Sus (experimental)", function()
+    if not selectedTarget or not selectedTarget.Character then return end
+    local arm = selectedTarget.Character:FindFirstChild("Right Arm") or selectedTarget.Character:FindFirstChild("RightUpperArm")
+    if arm then
+        arm.CFrame = arm.CFrame * CFrame.Angles(math.rad(90), 0, 0)
+    end
+end)
+
+Tabs.Troll:AddButton("Sus Atrás do Jogador", function()
+    if not selectedTarget or not selectedTarget.Character then return end
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+    if root and targetRoot then
+        root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
+    end
+end)
+
+Tabs.Troll:AddButton("Sus Cara do Jogador", function()
+    if not selectedTarget or not selectedTarget.Character then return end
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local targetHead = selectedTarget.Character:FindFirstChild("Head")
+    if root and targetHead then
+        root.CFrame = targetHead.CFrame * CFrame.new(0, 0.5, 0.5)
+    end
+end)
 
 -- ========================================
 -- ABA ÁUDIO
