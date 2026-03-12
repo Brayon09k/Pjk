@@ -310,8 +310,8 @@ local Tabs = {
     Teleport = criarAba("Teleporte"),
     Troll = criarAba("Troll"),
     Audio = criarAba("Áudio"),
-    Config = criarAba("Config")
-    protect = criarAba("Proteção")
+    Config = criarAba("Config"),
+    Protect = criarAba("Proteção")  -- <--- LINHA CORRIGIDA (com vírgula e maiúsculo)
 }
 containers[1].Visible = true
 
