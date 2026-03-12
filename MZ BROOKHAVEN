@@ -412,8 +412,9 @@ Tabs.Player:AddToggle("Invisibilidade", false, function(v)
     end
 end)
 
+-- Loop do No Clip (unificado)
 RunService.Stepped:Connect(function()
-    if noclip and LocalPlayer.Character then
+    if (noclip or noclipProtect) and LocalPlayer.Character then
         for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
             if part:IsA("BasePart") then part.CanCollide = false end
         end
