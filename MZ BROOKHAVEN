@@ -657,25 +657,6 @@ Tabs.Troll:AddButton("Retornar Boneco", function()
     if pirralho then pirralho:Destroy() end
 end)
 
- 
-    for _, nome in ipairs(playerList) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, 0, 0, 25)
-        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        btn.BackgroundTransparency = 0.1
-        btn.Text = nome
-        btn.TextColor3 = Color3.new(1, 1, 1)
-        btn.Font = Enum.Font.Gotham
-        btn.TextSize = 12
-        btn.Parent = trollDropdownList
-        btn.MouseButton1Click:Connect(function()
-            selectedTarget = Players:FindFirstChild(nome)
-            trollDropdownBtn.Text = nome
-            trollDropdownList.Visible = false
-        end)
-    end
-end
-
 trollDropdownBtn.MouseButton1Click:Connect(function()
     refreshTrollDropdown()
     trollDropdownList.Visible = not trollDropdownList.Visible
