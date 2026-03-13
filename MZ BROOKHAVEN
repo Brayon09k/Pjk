@@ -549,6 +549,9 @@ dropdownList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 dropdownList.BackgroundTransparency = 0.1
 dropdownList.Visible = false
 dropdownList.Parent = dropdownFrame
+dropdownFrame.ZIndex = 10
+dropdownList.ZIndex = 10
+Tabs.Troll.container.ClipsDescendants = false
 dropdownList.ScrollBarThickness = 4
 dropdownList.CanvasSize = UDim2.new(0, 0, 0, 0)
 
