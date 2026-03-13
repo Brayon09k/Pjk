@@ -176,13 +176,19 @@ local function criarAba(nome)
     layout.Parent = container
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Padding = UDim.new(0, 5)
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    container.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+end)
 
-    btn.MouseButton1Click:Connect(function()
-        for _, c in ipairs(containers) do
-            c.Visible = false
-        end
-        container.Visible = true
-    end)
+     btn.MouseButton1Click:Connect(function()
+    for i, c in ipairs(containers) do
+        c.Visible = false
+        abas[i].BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    end
+    container.Visible = true
+    abas[1].BackgroundColor3 = Color3.fromRGB(70, 70, 140)
+    btn.BackgroundColor3 = Color3.fromRGB(70, 70, 140)
+end)
 
     table.insert(abas, btn)
     table.insert(containers, container)
@@ -571,6 +577,9 @@ local function refreshDropdown()
             btn.Font = Enum.Font.Gotham
             btn.TextSize = 12
             btn.Parent = dropdownList
+            dropdownFrame.ZIndex = 10
+dropdownList.ZIndex = 10
+Tabs.Troll.container.ClipsDescendants = false
 
             btn.MouseButton1Click:Connect(function()
                 selectedTarget = player
@@ -1022,18 +1031,15 @@ end)
 print("Mz hub (brookhaven) carregado! Nome: " .. NOME .. " | Bio: " .. BIO)
 
 -- ========================================
--- ABA PROTEÇÃO (conteúdo)
+-- ABA PROTEÇÃO (CORRIGIDA)
 -- ========================================
-Protect:AddSection("Proteções")
+Tabs.Protect:AddSection("Proteções")
 
--- No Clip (já existe, mas vamos adicionar um toggle aqui também)
 local noclipProtect = false
-Protect:AddToggle("No Clip", false, function(v) noclipProtect = v end)
--- (O loop do No Clip já existe no script, então ele funcionará com essa variável)
+Tabs.Protect:AddToggle("No Clip", false, function(v) noclipProtect = v end)
 
--- Void Protection
 local voidEnabled = false
-Protect:AddToggle("Void Protection", false, function(v)
+Tabs.Protect:AddToggle("Void Protection", false, function(v)
     voidEnabled = v
     if v then
         if not _G.voidConn then
@@ -1050,13 +1056,11 @@ Protect:AddToggle("Void Protection", false, function(v)
     end
 end)
 
--- Anti Sit
 local antiSit = false
-Protect:AddToggle("Anti Sit", false, function(v) antiSit = v end)
+Tabs.Protect:AddToggle("Anti Sit", false, function(v) antiSit = v end)
 
--- Anti Fling (protege contra fling de outros scripts)
 local antiFling = false
-Protect:AddToggle("Anti Fling", false, function(v)
+Tabs.Protect:AddToggle("Anti Fling", false, function(v)
     antiFling = v
     if v then
         if not _G.flingConn then
@@ -1077,9 +1081,8 @@ Protect:AddToggle("Anti Fling", false, function(v)
     end
 end)
 
--- Anti Flashbang / Skybox
 local antiFlash = false
-Protect:AddToggle("Anti Flashbang", false, function(v)
+Tabs.Protect:AddToggle("Anti Flashbang", false, function(v)
     antiFlash = v
     if v then
         if not _G.flashConn then
@@ -1097,9 +1100,8 @@ Protect:AddToggle("Anti Flashbang", false, function(v)
     end
 end)
 
--- Anti Lag (remove itens desnecessários do personagem)
 local antiLag = false
-Protect:AddToggle("Anti Lag", false, function(v)
+Tabs.Protect:AddToggle("Anti Lag", false, function(v)
     antiLag = v
     if v then
         if not _G.lagConn then
@@ -1109,7 +1111,6 @@ Protect:AddToggle("Anti Lag", false, function(v)
                     if LocalPlayer.Character then
                         for _, item in ipairs(LocalPlayer.Character:GetChildren()) do
                             if item:IsA("Tool") or item:IsA("Accessory") then
-                                -- Remove itens que não são essenciais (ex: celular, bola)
                                 if item.Name:match("Phone") or item.Name:match("Ball") or item.Name:match("Taser") then
                                     item:Destroy()
                                 end
