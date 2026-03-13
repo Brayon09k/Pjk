@@ -812,6 +812,172 @@ UserInputService.InputBegan:Connect(function(input)
 end)
 
 -- ========================================
+-- FUNÇÃO PIRRALHO (CRIANÇA) - DO DRIP CLIENT
+-- ========================================
+
+-- Variáveis de controle
+local chasingplayer = nil
+local parteSelecionada = "HumanoidRootPart"
+local babyConn = nil
+
+-- Mapeamento das partes do corpo (igual ao Drip Client)
+local parteMapeada = {
+    ["Cabeça"] = "Head",
+    ["Peito Superior"] = "UpperTorso",
+    ["Barriga Inferior"] = "LowerTorso",
+    ["Frente do Corpo"] = "HumanoidRootPart",
+    ["Frente"] = "HumanoidRootPart",
+    ["Traseiro"] = "HumanoidRootPart"
+}
+
+-- Lista de nomes para o pirralho (pode editar)
+local nomesRP = {
+    "oi kkkk", "Sou Seu filho", "Armaria", "Tenho Dono: Lucas", "Estoy loco",
+    "XALALALAL", "ANALFABETO", "Criança", "Web namoro", "Veia", "DRIP CLIENT",
+    "KITA!!!!", "MÃƒEEEE", "PAIII", "BANCOPAN", "Calada", "Tenho Dona: Lolyta", "Uso Hack"
+}
+
+-- DROPDOWN 1: Selecionar jogador alvo
+Tabs.Troll:AddSection("Pirralho (Criança)")
+
+local playerDropdown = Tabs.Troll:AddDropdown({
+    Name = "Escolher Jogador",
+    Description = "Selecione quem o pirralho irá seguir",
+    Options = {},  -- será preenchido depois
+    Default = "Boneco",
+    Callback = function(selected)
+        chasingplayer = game.Players:FindFirstChild(selected) or nil
+    end
+})
+
+-- Botão para atualizar a lista de jogadores
+Tabs.Troll:AddButton("Atualizar Jogadores", function()
+    local lista = {}
+    for _, v in ipairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer then
+            table.insert(lista, v.Name)
+        end
+    end
+    playerDropdown:Set(lista)
+end)
+
+-- DROPDOWN 2: Escolher nome que aparece no pirralho
+Tabs.Troll:AddDropdown({
+    Name = "Selecionar Nome RP",
+    Description = "Escolha uma tag para o pirralho",
+    Options = nomesRP,
+    Default = "Nome",
+    Callback = function(nomeEscolhido)
+        local evento = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1RPNam1eTex1t")
+        if evento then
+            evento:FireServer("RolePlayFollow", nomeEscolhido)
+        end
+    end
+})
+
+-- DROPDOWN 3: Escolher parte do corpo onde o pirralho fica preso
+Tabs.Troll:AddDropdown({
+    Name = "Parte do Corpo",
+    Description = "Onde o pirralho ficará preso no corpo",
+    Options = {"Cabeça", "Peito Superior", "Barriga Inferior", "Frente do Corpo", "Frente", "Traseiro"},
+    Default = "Partes",
+    Callback = function(opcao)
+        parteSelecionada = parteMapeada[opcao] or "HumanoidRootPart"
+    end
+})
+
+-- TOGGLE: Visualizar o jogador alvo
+Tabs.Troll:AddToggle("Visualizar Jogador", false, function(value)
+    if value then
+        if not _G.viewBabyConn then
+            _G.viewBabyConn = RunService.Heartbeat:Connect(function()
+                if chasingplayer and chasingplayer.Character then
+                    local hum = chasingplayer.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        Camera.CameraSubject = hum
+                    end
+                end
+            end)
+        end
+    else
+        if _G.viewBabyConn then
+            _G.viewBabyConn:Disconnect()
+            _G.viewBabyConn = nil
+            if LocalPlayer.Character then
+                Camera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            end
+        end
+    end
+end)
+
+-- BOTÃO PRINCIPAL: Enviar pirralho
+Tabs.Troll:AddButton("Enviar Pirralho", function()
+    if not chasingplayer then
+        warn("Nenhum jogador selecionado!")
+        return
+    end
+
+    local targetChar = workspace:FindFirstChild(chasingplayer.Name)
+    if not targetChar then
+        warn("Jogador alvo não encontrado no workspace.")
+        return
+    end
+
+    -- Se o pirralho ainda não existe, cria ele
+    if not workspace:FindFirstChild(LocalPlayer.Name) or not workspace[LocalPlayer.Name]:FindFirstChild("FollowCharacter") then
+        local babyRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Bab1yFollo1w")
+        if babyRemote then
+            babyRemote:FireServer("CharacterFollowSpawnPlayer", "BabyBoy")
+            task.wait(0.3)
+        else
+            warn("Remote da criança não encontrado. O jogo pode ter atualizado.")
+            return
+        end
+    end
+
+    local pirralho = workspace[LocalPlayer.Name] and workspace[LocalPlayer.Name]:FindFirstChild("FollowCharacter")
+    local parteAlvo = targetChar:FindFirstChild(parteSelecionada)
+
+    if pirralho and parteAlvo then
+        -- Move o pirralho para o personagem do alvo
+        pirralho.Parent = targetChar
+
+        -- Desconecta qualquer conexão anterior
+        if babyConn then
+            babyConn:Disconnect()
+            babyConn = nil
+        end
+
+        -- Conexão para manter o pirralho na parte escolhida
+        babyConn = RunService.Heartbeat:Connect(function()
+            if pirralho and pirralho:FindFirstChild("Torso") and parteAlvo and parteAlvo.Parent then
+                pirralho.Torso.BodyPosition.Position = parteAlvo.Position
+                pirralho.Torso.BodyGyro.CFrame = parteAlvo.CFrame
+            else
+                if babyConn then
+                    babyConn:Disconnect()
+                    babyConn = nil
+                end
+            end
+        end)
+    else
+        warn("A parte '" .. parteSelecionada .. "' não existe no jogador alvo.")
+    end
+end)
+
+-- BOTÃO PARA RETORNAR O BONECO (REMOVER)
+Tabs.Troll:AddButton("Retornar Boneco", function()
+    if babyConn then
+        babyConn:Disconnect()
+        babyConn = nil
+    end
+    local pirralho = workspace:FindFirstChild(LocalPlayer.Name) and workspace[LocalPlayer.Name]:FindFirstChild("FollowCharacter")
+    if pirralho then
+        pirralho:Destroy()
+    end
+end)
+
+-- ========================================
 -- ABA ÁUDIO
 -- ========================================
 Tabs.Audio:AddSection("Tocar Áudio")
