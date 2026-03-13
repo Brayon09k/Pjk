@@ -632,6 +632,156 @@ Tabs.Troll:AddButton("Enviar Pirralho para o Jogador", function()
             pirralho.Parent = selectedTarget.Character
             local parteAlvo = selectedTarget.Character:FindFirstChild("Head")
             if parteAlvo then
+-- ========================================
+-- ABA TROLL (com dropdown e função Criança)
+-- ========================================
+Tabs.Troll:AddSection("Selecionar Jogador")
+
+-- Frame do dropdown (caixinha)
+local dropdownFrame = Instance.new("Frame")
+dropdownFrame.Size = UDim2.new(1, -10, 0, 30)
+dropdownFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+dropdownFrame.BackgroundTransparency = 0.1
+dropdownFrame.Parent = Tabs.Troll.container
+Instance.new("UICorner", dropdownFrame).CornerRadius = UDim.new(0, 6)
+
+-- Botão que mostra o nome selecionado
+local dropdownBtn = Instance.new("TextButton")
+dropdownBtn.Size = UDim2.new(1, 0, 1, 0)
+dropdownBtn.BackgroundTransparency = 1
+dropdownBtn.Text = "Selecione um jogador"
+dropdownBtn.TextColor3 = Color3.new(1, 1, 1)
+dropdownBtn.Font = Enum.Font.Gotham
+dropdownBtn.TextSize = 14
+dropdownBtn.Parent = dropdownFrame
+
+-- Lista de jogadores (invisível inicialmente)
+local dropdownList = Instance.new("ScrollingFrame")
+dropdownList.Size = UDim2.new(1, 0, 0, 120)
+dropdownList.Position = UDim2.new(0, 0, 1, 0)
+dropdownList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+dropdownList.BackgroundTransparency = 0.1
+dropdownList.Visible = false
+dropdownList.Parent = dropdownFrame
+
+local selectedTarget = nil
+
+-- Função para atualizar a lista de jogadores
+local function refreshDropdown()
+    -- Limpa a lista antiga
+    for _, child in ipairs(dropdownList:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    -- Adiciona os jogadores atuais
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 0, 25)
+            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            btn.BackgroundTransparency = 0.1
+            btn.Text = player.Name
+            btn.TextColor3 = Color3.new(1, 1, 1)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 12
+            btn.Parent = dropdownList
+            btn.MouseButton1Click:Connect(function()
+                selectedTarget = player
+                dropdownBtn.Text = player.Name
+                dropdownList.Visible = false
+            end)
+        end
+    end
+end
+
+-- Abre/fecha a lista ao clicar no botão
+dropdownBtn.MouseButton1Click:Connect(function()
+    refreshDropdown()
+    dropdownList.Visible = not dropdownList.Visible
+end)
+
+-- Botão para atualizar a lista manualmente
+Tabs.Troll:AddButton("Atualizar Lista", refreshDropdown)
+
+-- ========================================
+-- AÇÕES COM O JOGADOR SELECIONADO
+-- ========================================
+Tabs.Troll:AddSection("Ações com o Jogador")
+
+Tabs.Troll:AddButton("Teleportar para Jogador", function()
+    if selectedTarget and selectedTarget.Character then
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame
+        end
+    else
+        warn("Selecione um jogador primeiro!")
+    end
+end)
+
+Tabs.Troll:AddButton("Fling com Bola", function()
+    if not selectedTarget then
+        warn("Selecione um jogador primeiro!")
+        return
+    end
+    local ball = workspace:FindFirstChild("WorkspaceCom") and workspace.WorkspaceCom:FindFirstChild("001_SoccerBalls"):FindFirstChild("Soccer"..LocalPlayer.Name)
+    if not ball then
+        local args = { [1] = "PickingTools", [2] = "SoccerBall" }
+        local toolRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Too1l")
+        if toolRemote then toolRemote:InvokeServer(unpack(args)) end
+        task.wait(1)
+        ball = workspace:FindFirstChild("WorkspaceCom") and workspace.WorkspaceCom:FindFirstChild("001_SoccerBalls"):FindFirstChild("Soccer"..LocalPlayer.Name)
+    end
+    if ball then
+        ball.CanCollide = false
+        ball.Velocity = Vector3.new(9e8, 9e8, 9e8)
+    end
+end)
+
+Tabs.Troll:AddButton("Travar Jogador (Freeze)", function()
+    if selectedTarget and selectedTarget.Character then
+        for _, v in ipairs(selectedTarget.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.Anchored = true
+            end
+        end
+    else
+        warn("Selecione um jogador primeiro!")
+    end
+end)
+
+Tabs.Troll:AddButton("Destravar", function()
+    if selectedTarget and selectedTarget.Character then
+        for _, v in ipairs(selectedTarget.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.Anchored = false
+            end
+        end
+    else
+        warn("Selecione um jogador primeiro!")
+    end
+end)
+
+-- ========================================
+-- FUNÇÃO CRIANÇA (PIRRALHO)
+-- ========================================
+Tabs.Troll:AddSection("Criança (Pirralho)")
+
+Tabs.Troll:AddButton("Enviar Pirralho para o Jogador", function()
+    if not selectedTarget then
+        warn("Selecione um jogador primeiro!")
+        return
+    end
+    local babyRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Bab1yFollo1w")
+    if babyRemote then
+        babyRemote:FireServer("CharacterFollowSpawnPlayer", "BabyBoy")
+        task.wait(0.5)
+        local pirralho = workspace:FindFirstChild(LocalPlayer.Name) and workspace[LocalPlayer.Name]:FindFirstChild("FollowCharacter")
+        if pirralho and selectedTarget.Character then
+            pirralho.Parent = selectedTarget.Character
+            local parteAlvo = selectedTarget.Character:FindFirstChild("Head") or selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+            if parteAlvo then
                 if _G.babyConn then _G.babyConn:Disconnect() end
                 _G.babyConn = RunService.Heartbeat:Connect(function()
                     if pirralho and pirralho.Parent and parteAlvo and parteAlvo.Parent then
@@ -652,13 +802,21 @@ Tabs.Troll:AddButton("Enviar Pirralho para o Jogador", function()
 end)
 
 Tabs.Troll:AddButton("Retornar Boneco", function()
-    if _G.babyConn then _G.babyConn:Disconnect() _G.babyConn = nil end
+    if _G.babyConn then
+        _G.babyConn:Disconnect()
+        _G.babyConn = nil
+    end
     local pirralho = workspace:FindFirstChild(LocalPlayer.Name) and workspace[LocalPlayer.Name]:FindFirstChild("FollowCharacter")
-    if pirralho then pirralho:Destroy() end
+    if pirralho then
+        pirralho:Destroy()
+    end
 end)
 
 Tabs.Troll:AddButton("Visualizar Jogador", function()
-    if not selectedTarget then return end
+    if not selectedTarget then
+        warn("Selecione um jogador primeiro!")
+        return
+    end
     if _G.viewConn then
         _G.viewConn:Disconnect()
         _G.viewConn = nil
