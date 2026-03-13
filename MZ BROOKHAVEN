@@ -180,14 +180,13 @@ local function criarAba(nome)
     container.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
 end)
 
-     btn.MouseButton1Click:Connect(function()
+btn.MouseButton1Click:Connect(function()
     for i, c in ipairs(containers) do
         c.Visible = false
         abas[i].BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     end
     container.Visible = true
-    abas[1].BackgroundColor3 = Color3.fromRGB(70, 70, 140)
-    btn.BackgroundColor3 = Color3.fromRGB(70, 70, 140)
+    btn.BackgroundColor3 = Color3.fromRGB(70, 70, 140)   -- só o botão clicado fica destacado
 end)
 
     table.insert(abas, btn)
@@ -320,6 +319,7 @@ local Tabs = {
     Protect = criarAba("Proteção")  -- <--- LINHA CORRIGIDA (com vírgula e maiúsculo)
 }
 containers[1].Visible = true
+abas[1].BackgroundColor3 = Color3.fromRGB(70, 70, 140)
 
 -- Controles da janela
 local minimized = false
