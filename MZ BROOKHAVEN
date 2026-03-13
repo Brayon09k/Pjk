@@ -511,9 +511,11 @@ Tabs.Teleport:AddButton("Atualizar Lista", function()
 end)
 
 -- ========================================
--- ABA TROLL (com dropdown e função Criança)
+-- ABA TROLL (Mz BROOKHAVEN - COMPLETA)
 -- ========================================
-Tabs.Troll:AddSection("Selecionar Jogador")
+
+-- Variável global do jogador selecionado (usada pelo pirralho também)
+selectedTarget = nil
 
 -- Frame do dropdown (caixinha)
 local dropdownFrame = Instance.new("Frame")
@@ -533,7 +535,7 @@ dropdownBtn.Font = Enum.Font.Gotham
 dropdownBtn.TextSize = 14
 dropdownBtn.Parent = dropdownFrame
 
--- Lista de jogadores (invisível inicialmente)
+-- Lista de jogadores (invisível)
 local dropdownList = Instance.new("ScrollingFrame")
 dropdownList.Size = UDim2.new(1, 0, 0, 120)
 dropdownList.Position = UDim2.new(0, 0, 1, 0)
@@ -541,18 +543,23 @@ dropdownList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 dropdownList.BackgroundTransparency = 0.1
 dropdownList.Visible = false
 dropdownList.Parent = dropdownFrame
+dropdownList.ScrollBarThickness = 4
+dropdownList.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-local selectedTarget = nil
+-- Layout da lista
+local listLayout = Instance.new("UIListLayout")
+listLayout.Parent = dropdownList
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Padding = UDim.new(0, 2)
 
 -- Função para atualizar a lista de jogadores
 local function refreshDropdown()
-    -- Limpa a lista antiga
+    -- Limpa botões antigos
     for _, child in ipairs(dropdownList:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
-        end
+        if child:IsA("TextButton") then child:Destroy() end
     end
-    -- Adiciona os jogadores atuais
+
+    -- Adiciona jogadores atuais
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local btn = Instance.new("TextButton")
@@ -564,6 +571,7 @@ local function refreshDropdown()
             btn.Font = Enum.Font.Gotham
             btn.TextSize = 12
             btn.Parent = dropdownList
+
             btn.MouseButton1Click:Connect(function()
                 selectedTarget = player
                 dropdownBtn.Text = player.Name
@@ -571,6 +579,13 @@ local function refreshDropdown()
             end)
         end
     end
+
+    -- Ajusta o tamanho da scroll
+    local count = 0
+    for _, child in ipairs(dropdownList:GetChildren()) do
+        if child:IsA("TextButton") then count = count + 1 end
+    end
+    dropdownList.CanvasSize = UDim2.new(0, 0, 0, count * 27)
 end
 
 -- Abre/fecha a lista ao clicar no botão
@@ -579,163 +594,220 @@ dropdownBtn.MouseButton1Click:Connect(function()
     dropdownList.Visible = not dropdownList.Visible
 end)
 
--- Botão para atualizar a lista manualmente
+-- Botão "Atualizar Lista"
 Tabs.Troll:AddButton("Atualizar Lista", refreshDropdown)
 
--- ========================================
--- AÇÕES COM O JOGADOR SELECIONADO
--- ========================================
-Tabs.Troll:AddSection("Ações com o Jogador")
-
-Tabs.Troll:AddButton("Teleportar para Jogador", function()
-    if selectedTarget and selectedTarget.Character then
-        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if root then
-            root.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame
-        end
-    else
-        warn("Selecione um jogador primeiro!")
-    end
-end)
-
-Tabs.Troll:AddButton("Fling com Bola", function()
-    if not selectedTarget then
-        warn("Selecione um jogador primeiro!")
-        return
-    end
-    local ball = workspace:FindFirstChild("WorkspaceCom") and workspace.WorkspaceCom:FindFirstChild("001_SoccerBalls"):FindFirstChild("Soccer"..LocalPlayer.Name)
-    if not ball then
-        local args = { [1] = "PickingTools", [2] = "SoccerBall" }
-        local toolRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Too1l")
-        if toolRemote then toolRemote:InvokeServer(unpack(args)) end
-        task.wait(1)
-        ball = workspace:FindFirstChild("WorkspaceCom") and workspace.WorkspaceCom:FindFirstChild("001_SoccerBalls"):FindFirstChild("Soccer"..LocalPlayer.Name)
-    end
-    if ball then
-        ball.CanCollide = false
-        ball.Velocity = Vector3.new(9e8, 9e8, 9e8)
-    end
-end)
-
-Tabs.Troll:AddButton("Travar Jogador (Freeze)", function()
-    if selectedTarget and selectedTarget.Character then
-        for _, v in ipairs(selectedTarget.Character:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.Anchored = true
-            end
-        end
-    else
-        warn("Selecione um jogador primeiro!")
-    end
-end)
-
-Tabs.Troll:AddButton("Destravar", function()
-    if selectedTarget and selectedTarget.Character then
-        for _, v in ipairs(selectedTarget.Character:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.Anchored = false
-            end
-        end
-    else
-        warn("Selecione um jogador primeiro!")
-    end
-end)
-
--- ========================================
--- FUNÇÃO CRIANÇA (PIRRALHO)
--- ========================================
-Tabs.Troll:AddSection("Criança (Pirralho)")
-
-Tabs.Troll:AddButton("Enviar Pirralho para o Jogador", function()
-    if not selectedTarget then
-        warn("Selecione um jogador primeiro!")
-        return
-    end
-    local babyRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Bab1yFollo1w")
-    if babyRemote then
-        babyRemote:FireServer("CharacterFollowSpawnPlayer", "BabyBoy")
-        task.wait(0.5)
-        local pirralho = workspace:FindFirstChild(LocalPlayer.Name) and workspace[LocalPlayer.Name]:FindFirstChild("FollowCharacter")
-        if pirralho and selectedTarget.Character then
-            pirralho.Parent = selectedTarget.Character
-            local parteAlvo = selectedTarget.Character:FindFirstChild("Head") or selectedTarget.Character:FindFirstChild("HumanoidRootPart")
-            if parteAlvo then
-                if _G.babyConn then _G.babyConn:Disconnect() end
-                _G.babyConn = RunService.Heartbeat:Connect(function()
-                    if pirralho and pirralho.Parent and parteAlvo and parteAlvo.Parent then
-                        if pirralho:FindFirstChild("Torso") then
-                            pirralho.Torso.CFrame = parteAlvo.CFrame * CFrame.new(0, 1, 0)
-                        end
-                    else
-                        if _G.babyConn then _G.babyConn:Disconnect() _G.babyConn = nil end
-                    end
-                end)
-            end
-        else
-            warn("Não foi possível criar o pirralho.")
-        end
-    else
-        warn("Remote da criança não encontrado. O jogo pode ter atualizado.")
-    end
-end)
-
-Tabs.Troll:AddButton("Retornar Boneco", function()
-    if _G.babyConn then
-        _G.babyConn:Disconnect()
-        _G.babyConn = nil
-    end
-    local pirralho = workspace:FindFirstChild(LocalPlayer.Name) and workspace[LocalPlayer.Name]:FindFirstChild("FollowCharacter")
-    if pirralho then
-        pirralho:Destroy()
-    end
-end)
-
-Tabs.Troll:AddButton("Visualizar Jogador", function()
-    if not selectedTarget then
-        warn("Selecione um jogador primeiro!")
-        return
-    end
-    if _G.viewConn then
-        _G.viewConn:Disconnect()
-        _G.viewConn = nil
-        Camera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-    else
-        if selectedTarget.Character then
+-- Toggle "Visualizar Jogador"
+local viewing = false
+Tabs.Troll:AddToggle("Visualizar Jogador", false, function(v)
+    viewing = v
+    if viewing then
+        if not _G.viewConn then
             _G.viewConn = RunService.Heartbeat:Connect(function()
-                if selectedTarget.Character and selectedTarget.Character:FindFirstChild("Humanoid") then
-                    Camera.CameraSubject = selectedTarget.Character.Humanoid
+                if selectedTarget and selectedTarget.Character then
+                    local hum = selectedTarget.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        Camera.CameraSubject = hum
+                    end
                 else
-                    _G.viewConn:Disconnect()
-                    _G.viewConn = nil
+                    if _G.viewConn then _G.viewConn:Disconnect() _G.viewConn = nil end
                 end
             end)
         end
+    else
+        if _G.viewConn then _G.viewConn:Disconnect() _G.viewConn = nil end
+        if LocalPlayer.Character then
+            Camera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        end
     end
 end)
 
-Tabs.Troll:AddButton("Braço Sus (experimental)", function()
-    if not selectedTarget or not selectedTarget.Character then return end
-    local arm = selectedTarget.Character:FindFirstChild("Right Arm") or selectedTarget.Character:FindFirstChild("RightUpperArm")
-    if arm then
-        arm.CFrame = arm.CFrame * CFrame.Angles(math.rad(90), 0, 0)
+-- Dropdown para escolher método (Matar / Puxar)
+local metodoFrame = Instance.new("Frame")
+metodoFrame.Size = UDim2.new(1, -10, 0, 30)
+metodoFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+metodoFrame.BackgroundTransparency = 0.1
+metodoFrame.Parent = Tabs.Troll.container
+Instance.new("UICorner", metodoFrame).CornerRadius = UDim.new(0, 6)
+
+local metodoBtn = Instance.new("TextButton")
+metodoBtn.Size = UDim2.new(1, 0, 1, 0)
+metodoBtn.BackgroundTransparency = 1
+metodoBtn.Text = "Selecione o método"
+metodoBtn.TextColor3 = Color3.new(1, 1, 1)
+metodoBtn.Font = Enum.Font.Gotham
+metodoBtn.TextSize = 14
+metodoBtn.Parent = metodoFrame
+
+local metodoList = Instance.new("ScrollingFrame")
+metodoList.Size = UDim2.new(1, 0, 0, 60)
+metodoList.Position = UDim2.new(0, 0, 1, 0)
+metodoList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+metodoList.BackgroundTransparency = 0.1
+metodoList.Visible = false
+metodoList.Parent = metodoFrame
+metodoList.ScrollBarThickness = 4
+
+local metodos = {"Matar", "Puxar"}
+local metodoSelecionado = "Matar"
+
+for _, nome in ipairs(metodos) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.BackgroundTransparency = 0.1
+    btn.Text = nome
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.Parent = metodoList
+    btn.MouseButton1Click:Connect(function()
+        metodoSelecionado = nome
+        metodoBtn.Text = nome
+        metodoList.Visible = false
+    end)
+end
+
+metodoBtn.MouseButton1Click:Connect(function()
+    metodoList.Visible = not metodoList.Visible
+end)
+
+-- Variáveis de controle das ações
+local acaoAtiva = false
+local acaoThread = nil
+
+-- Função de MATAR (exemplo com ônibus – adapte se quiser)
+local function funcaoMatar()
+    while acaoAtiva and selectedTarget and selectedTarget.Character do
+        local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+        if targetRoot then
+            -- Exemplo: teleporta o alvo para o void (mude para seu método preferido)
+            targetRoot.CFrame = CFrame.new(0, -500, 0)
+        end
+        task.wait(0.1)
+    end
+end
+
+-- Função de PUXAR (com sofá) – baseada no Drip Client
+local function funcaoPuxar()
+    -- Limpa ferramentas antigas
+    local args = { [1] = "ClearAllTools" }
+    local clearRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Clea1rTool1s")
+    if clearRemote then clearRemote:FireServer(unpack(args)) end
+    task.wait(0.2)
+
+    -- Pega o sofá
+    local toolRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Too1l")
+    if toolRemote then
+        toolRemote:InvokeServer("PickingTools", "Couch")
+    end
+    task.wait(0.3)
+
+    local couch = LocalPlayer.Backpack:FindFirstChild("Couch")
+    if not couch then
+        warn("Sofá não encontrado")
+        return
+    end
+    couch.Parent = LocalPlayer.Character
+    task.wait(0.1)
+
+    -- Desabilita os assentos do sofá
+    local seat1 = couch:FindFirstChild("Seat1")
+    local seat2 = couch:FindFirstChild("Seat2")
+    if seat1 and seat2 then
+        seat1.Disabled = true
+        seat2.Disabled = true
+    end
+
+    -- Loop de puxar
+    while acaoAtiva and selectedTarget and selectedTarget.Character and couch.Parent do
+        local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+        if targetRoot and seat1 then
+            seat1.CFrame = targetRoot.CFrame * CFrame.new(0, 2, -2)
+        else
+            break
+        end
+        task.wait()
+    end
+
+    -- Limpeza
+    if couch and couch.Parent then
+        couch.Parent = LocalPlayer.Backpack
+    end
+    if clearRemote then
+        clearRemote:FireServer("ClearAllTools")
+    end
+end
+
+-- Botão MATAR (usa o método selecionado)
+Tabs.Troll:AddButton("Matar", function()
+    if not selectedTarget then
+        warn("Selecione um jogador primeiro!")
+        return
+    end
+    if acaoAtiva then
+        warn("Já existe uma ação em andamento. Use 'Parar' primeiro.")
+        return
+    end
+    acaoAtiva = true
+    if metodoSelecionado == "Matar" then
+        acaoThread = task.spawn(funcaoMatar)
+    else
+        acaoThread = task.spawn(funcaoPuxar)
     end
 end)
 
-Tabs.Troll:AddButton("Sus Atrás do Jogador", function()
-    if not selectedTarget or not selectedTarget.Character then return end
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
-    if root and targetRoot then
-        root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
+-- Botão PUXAR (independente do método selecionado)
+Tabs.Troll:AddButton("Puxar", function()
+    if not selectedTarget then
+        warn("Selecione um jogador primeiro!")
+        return
+    end
+    if acaoAtiva then
+        warn("Já existe uma ação em andamento. Use 'Parar' primeiro.")
+        return
+    end
+    acaoAtiva = true
+    metodoSelecionado = "Puxar"  -- força puxar
+    acaoThread = task.spawn(funcaoPuxar)
+end)
+
+-- Botão PARAR
+Tabs.Troll:AddButton("Parar", function()
+    acaoAtiva = false
+    if acaoThread then
+        task.cancel(acaoThread)
+        acaoThread = nil
+    end
+    -- Limpeza extra
+    local clearRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Clea1rTool1s")
+    if clearRemote then
+        clearRemote:FireServer("ClearAllTools")
     end
 end)
 
-Tabs.Troll:AddButton("Sus Cara do Jogador", function()
-    if not selectedTarget or not selectedTarget.Character then return end
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    local targetHead = selectedTarget.Character:FindFirstChild("Head")
-    if root and targetHead then
-        root.CFrame = targetHead.CFrame * CFrame.new(0, 0.5, 0.5)
+-- (Opcional) Fecha o dropdown se clicar fora
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        task.wait()
+        if dropdownList.Visible then
+            local mousePos = UserInputService:GetMouseLocation()
+            local absPos = dropdownFrame.AbsolutePosition
+            local size = dropdownFrame.AbsoluteSize
+            if mousePos.X < absPos.X or mousePos.X > absPos.X + size.X or
+               mousePos.Y < absPos.Y or mousePos.Y > absPos.Y + size.Y + 120 then
+                dropdownList.Visible = false
+            end
+        end
+        if metodoList.Visible then
+            local mousePos = UserInputService:GetMouseLocation()
+            local absPos = metodoFrame.AbsolutePosition
+            local size = metodoFrame.AbsoluteSize
+            if mousePos.X < absPos.X or mousePos.X > absPos.X + size.X or
+               mousePos.Y < absPos.Y or mousePos.Y > absPos.Y + size.Y + 60 then
+                metodoList.Visible = false
+            end
+        end
     end
 end)
 
