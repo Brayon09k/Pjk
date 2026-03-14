@@ -8,6 +8,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
+print("MzHub: Script iniciado com sucesso!")
+
 -- Nome e bio
 local NOME = "MZ"
 local BIO = "{MZ on script}"
@@ -43,7 +45,14 @@ end)
 local gui = Instance.new("ScreenGui")
 gui.Name = "MzHub"
 gui.ResetOnSpawn = false
-gui.Parent = game.CoreGui
+
+-- Tenta colocar no CoreGui, se falhar, coloca no PlayerGui
+local success, err = pcall(function()
+    gui.Parent = game.CoreGui
+end)
+if not success then
+    gui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+end
 
 -- Bolinha flutuante arrastável
 local floatButton = Instance.new("ImageButton")
