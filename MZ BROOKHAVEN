@@ -290,7 +290,6 @@ end)
             GetText = function() return box.Text end
         }
     end
-
     function methods:AddParagraph(titulo, valor)
         local para = Instance.new("TextLabel")
         para.Size = UDim2.new(1, -10, 0, 20)
@@ -303,74 +302,78 @@ end)
         para.Parent = container
 
         return { Set = function(t) para.Text = titulo .. ": " .. t end }
-    endfunction methods:AddDropdown(dados)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, -10, 0, 30)
-    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    frame.BackgroundTransparency = 0.1
-    frame.Parent = container
-    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
-
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = dados.Default or dados.Name or "Selecione"
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 14
-    btn.Parent = frame
-
-    local list = Instance.new("ScrollingFrame")
-    list.Size = UDim2.new(1, 0, 0, 120)
-    list.Position = UDim2.new(0, 0, 1, 0)
-    list.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    list.BackgroundTransparency = 0.1
-    list.Visible = false
-    list.Parent = frame
-    list.ScrollBarThickness = 4
-
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.Parent = list
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Padding = UDim.new(0, 2)
-
-    local function populate(options)
-        for _, child in ipairs(list:GetChildren()) do
-            if child:IsA("TextButton") then child:Destroy() end
-        end
-        for _, opt in ipairs(options) do
-            local optBtn = Instance.new("TextButton")
-            optBtn.Size = UDim2.new(1, 0, 0, 25)
-            optBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            optBtn.BackgroundTransparency = 0.1
-            optBtn.Text = opt
-            optBtn.TextColor3 = Color3.new(1, 1, 1)
-            optBtn.Font = Enum.Font.Gotham
-            optBtn.TextSize = 12
-            optBtn.Parent = list
-            optBtn.MouseButton1Click:Connect(function()
-                btn.Text = opt
-                list.Visible = false
-                if dados.Callback then dados.Callback(opt) end
-            end)
-        end
-        local count = #options
-        list.CanvasSize = UDim2.new(0, 0, 0, count * 27)
     end
 
-    btn.MouseButton1Click:Connect(function()
-        populate(dados.Options or {})
-        list.Visible = not list.Visible
-    end)
+    function methods:AddDropdown(dados)
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, -10, 0, 30)
+        frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        frame.BackgroundTransparency = 0.1
+        frame.Parent = container
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
-    return {
-        Set = function(newOptions)
-            populate(newOptions)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 1, 0)
+        btn.BackgroundTransparency = 1
+        btn.Text = dados.Default or dados.Name or "Selecione"
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 14
+        btn.Parent = frame
+
+        local list = Instance.new("ScrollingFrame")
+        list.Size = UDim2.new(1, 0, 0, 120)
+        list.Position = UDim2.new(0, 0, 1, 0)
+        list.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        list.BackgroundTransparency = 0.1
+        list.Visible = false
+        list.Parent = frame
+        list.ScrollBarThickness = 4
+
+        local listLayout = Instance.new("UIListLayout")
+        listLayout.Parent = list
+        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        listLayout.Padding = UDim.new(0, 2)
+
+        local function populate(options)
+            for _, child in ipairs(list:GetChildren()) do
+                if child:IsA("TextButton") then child:Destroy() end
+            end
+            for _, opt in ipairs(options) do
+                local optBtn = Instance.new("TextButton")
+                optBtn.Size = UDim2.new(1, 0, 0, 25)
+                optBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                optBtn.BackgroundTransparency = 0.1
+                optBtn.Text = opt
+                optBtn.TextColor3 = Color3.new(1, 1, 1)
+                optBtn.Font = Enum.Font.Gotham
+                optBtn.TextSize = 12
+                optBtn.Parent = list
+                optBtn.MouseButton1Click:Connect(function()
+                    btn.Text = opt
+                    list.Visible = false
+                    if dados.Callback then dados.Callback(opt) end
+                end)
+            end
+            local count = #options
+            list.CanvasSize = UDim2.new(0, 0, 0, count * 27)
         end
-    }
-end
+
+        btn.MouseButton1Click:Connect(function()
+            populate(dados.Options or {})
+            list.Visible = not list.Visible
+        end)
+
+        return {
+            Set = function(newOptions)
+                populate(newOptions)
+            end
+        }
+    end
 
     return methods
+end
+
 end
 
 -- Criar abas
