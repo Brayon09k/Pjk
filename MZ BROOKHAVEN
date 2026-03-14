@@ -580,9 +580,6 @@ local function refreshDropdown()
             btn.Font = Enum.Font.Gotham
             btn.TextSize = 12
             btn.Parent = dropdownList
-            dropdownFrame.ZIndex = 10
-dropdownList.ZIndex = 10
-Tabs.Troll.container.ClipsDescendants = false
 
             btn.MouseButton1Click:Connect(function()
                 selectedTarget = player
