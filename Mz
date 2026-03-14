@@ -1,0 +1,785 @@
+Enter-- Mz Hub Completo – Versão adaptada para Delta Mobile
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Variáveis globais (definidas antes para evitar erros)
+noclip = false
+infJump = false
+invis = false
+noclipProtect = false
+selectedTarget = nil
+chasingplayer = nil
+parteSelecionada = "HumanoidRootPart"
+babyConn = nil
+acaoAtiva = false
+acaoThread = nil
+
+-- Nome e bio (opcional, pode remover se não quiser)
+local NOME = "MZ"
+local BIO = "{MZ on script}"
+local function setRolePlayName(name)
+    local remote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1RPNam1eTex1t")
+    if remote then pcall(function() remote:FireServer("RolePlayName", name) end) end
+end
+local function setRolePlayBio(bio)
+    local remote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1RPNam1eTex1t")
+    if remote then pcall(function() remote:FireServer("RolePlayBio", bio) end) end
+end
+setRolePlayName(NOME)
+setRolePlayBio(BIO)
+
+-- GUI principal
+local gui = Instance.new("ScreenGui")
+gui.Name = "MzHub"
+gui.ResetOnSpawn = false
+gui.Parent = game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+
+-- Janela principal
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 700, 0, 500)
+main.Position = UDim2.new(0.5, -350, 0.5, -250)
+main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+main.Active = true
+main.Draggable = true
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", main).Color = Color3.new(0, 0, 0)
+
+-- Barra de título
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+titleBar.Parent = main
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 8)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(0.5, 0, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Mz Hub (Brookhaven)"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+-- Botão minimizar
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+minimizeBtn.Position = UDim2.new(1, -60, 0, 0)
+minimizeBtn.BackgroundTransparency = 1
+minimizeBtn.Text = "-"
+minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextSize = 20
+minimizeBtn.Parent = titleBar
+
+-- Botão fechar
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -30, 0, 0)
+closeBtn.BackgroundTransparency = 1
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 20
+closeBtn.Parent = titleBar
+closeBtn.MouseButton1Click:Connect(function() main.Visible = false end)
+
+-- Lista de abas
+local tabs = {}
+local tabFrames = {}
+
+-- Função para criar aba
+local function createTab(name)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 100, 0, 30)
+    btn.Position = UDim2.new(0, (#tabs * 100), 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.Text = name
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.Parent = main
+    table.insert(tabs, btn)
+
+    local frame = Instance.new("ScrollingFrame")
+    frame.Size = UDim2.new(1, 0, 1, -60)
+    frame.Position = UDim2.new(0, 0, 0, 60)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    frame.BackgroundTransparency = 0.1
+    frame.ScrollBarThickness = 6
+    frame.Visible = false
+    frame.Parent = main
+    table.insert(tabFrames, frame)
+
+    -- Layout automático
+    local layout = Instance.new("UIListLayout")
+    layout.Parent = frame
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 5)
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        frame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+    end)
+
+    btn.MouseButton1Click:Connect(function()
+        for i, f in ipairs(tabFrames) do
+            f.Visible = false
+            tabs[i].BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        end
+        frame.Visible = true
+        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 140)
+    end)
+
+    return frame
+end
+
+-- Criar todas as abas
+local tabInicio = createTab("Início")
+local tabJogador = createTab("Jogador")
+local tabTeleporte = createTab("Teleporte")
+local tabTroll = createTab("Troll")
+local tabAudio = createTab("Áudio")
+local tabConfig = createTab("Config")
+local tabProtecao = createTab("Proteção")
+
+-- Mostrar primeira aba
+tabFrames[1].Visible = true
+tabs[1].BackgroundColor3 = Color3.fromRGB(70, 70, 140)
+
+-- Funções auxiliares para adicionar widgets (adaptadas do original)
+local function addSection(parent, text)
+    local sec = Instance.new("TextLabel")
+    sec.Size = UDim2.new(1, -10, 0, 25)
+    sec.BackgroundTransparency = 1
+    sec.Text = text
+    sec.TextColor3 = Color3.fromRGB(200, 200, 200)
+    sec.Font = Enum.Font.GothamBold
+    sec.TextSize = 16
+    sec.TextXAlignment = Enum.TextXAlignment.Left
+    sec.Parent = parent
+end
+
+local function addButton(parent, text, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.BackgroundTransparency = 0.1
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.MouseButton1Click:Connect(callback)
+end
+
+local function addToggle(parent, text, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -10, 0, 30)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 30, 0, 20)
+    toggle.Position = UDim2.new(1, -35, 0.5, -10)
+    toggle.BackgroundColor3 = default and Color3.new(0, 1, 0) or Color3.new(0.5, 0.5, 0.5)
+    toggle.Text = ""
+    toggle.Parent = frame
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
+
+    local state = default
+    toggle.MouseButton1Click:Connect(function()
+        state = not state
+        toggle.BackgroundColor3 = state and Color3.new(0, 1, 0) or Color3.new(0.5, 0.5, 0.5)
+        callback(state)
+    end)
+end
+
+local function addTextBox(parent, title, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -10, 0, 50)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.Text = title
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(1, 0, 0, 25)
+    box.Position = UDim2.new(0, 0, 0, 20)
+    box.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    box.BackgroundTransparency = 0.1
+    box.Text = default or ""
+    box.TextColor3 = Color3.new(1, 1, 1)
+    box.PlaceholderText = title
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 14
+    box.Parent = frame
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+
+    box.FocusLost:Connect(function()
+        callback(box.Text)
+    end)
+
+    return {
+        Set = function(t) box.Text = t end,
+        GetText = function() return box.Text end
+    }
+end
+
+local function addParagraph(parent, title, initial)
+    local para = Instance.new("TextLabel")
+    para.Size = UDim2.new(1, -10, 0, 20)
+    para.BackgroundTransparency = 1
+    para.Text = title .. ": " .. initial
+    para.TextColor3 = Color3.new(1, 1, 1)
+    para.Font = Enum.Font.Gotham
+    para.TextSize = 14
+    para.TextXAlignment = Enum.TextXAlignment.Left
+    para.Parent = parent
+    return {
+        Set = function(val) para.Text = title .. ": " .. val end
+    }
+end
+
+local function addDropdown(parent, options, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -10, 0, 30)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    frame.BackgroundTransparency = 0.1
+    frame.Parent = parent
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = default or "Selecione"
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.Parent = frame
+
+    local list = Instance.new("ScrollingFrame")
+    list.Size = UDim2.new(1, 0, 0, 120)
+    list.Position = UDim2.new(0, 0, 1, 0)
+    list.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    list.BackgroundTransparency = 0.1
+    list.Visible = false
+    list.Parent = frame
+    list.ScrollBarThickness = 4
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Parent = list
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 2)
+
+    local function populate(opts)
+        for _, child in ipairs(list:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+        for _, opt in ipairs(opts) do
+            local optBtn = Instance.new("TextButton")
+            optBtn.Size = UDim2.new(1, 0, 0, 25)
+            optBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            optBtn.BackgroundTransparency = 0.1
+            optBtn.Text = opt
+            optBtn.TextColor3 = Color3.new(1, 1, 1)
+            optBtn.Font = Enum.Font.Gotham
+            optBtn.TextSize = 12
+            optBtn.Parent = list
+            optBtn.MouseButton1Click:Connect(function()
+                btn.Text = opt
+                list.Visible = false
+                if callback then callback(opt) end
+            end)
+        end
+        list.CanvasSize = UDim2.new(0, 0, 0, #opts * 27)
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        populate(options)
+        list.Visible = not list.Visible
+    end)
+
+    -- Fechar ao clicar fora (simplificado)
+    UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            task.wait()
+            if list.Visible then
+                local mousePos = UserInputService:GetMouseLocation()
+                local absPos = frame.AbsolutePosition
+                local size = frame.AbsoluteSize
+                if mousePos.X < absPos.X or mousePos.X > absPos.X + size.X or
+                   mousePos.Y < absPos.Y or mousePos.Y > absPos.Y + size.Y + 120 then
+                    list.Visible = false
+                end
+            end
+        end
+    end)
+
+    return {
+        Set = function(newOpts) populate(newOpts) end
+    }
+end
+
+-- ========================================
+-- POPULAR ABA INÍCIO
+-- ========================================
+addSection(tabInicio, "Status")
+local fpsLabel = addParagraph(tabInicio, "FPS", "0")
+local playerCount = addParagraph(tabInicio, "Jogadores", "0")
+
+RunService.RenderStepped:Connect(function()
+    fpsLabel:Set(math.floor(1 / RunService.RenderStepped:Wait()))
+    playerCount:Set(#Players:GetPlayers())
+end)
+
+addSection(tabInicio, "Ajustes")
+local speedBox = addTextBox(tabInicio, "Velocidade", "16", function(v)
+    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then hum.WalkSpeed = tonumber(v) or 16 end
+end)
+local jumpBox = addTextBox(tabInicio, "Pulo", "50", function(v)
+    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then hum.JumpPower = tonumber(v) or 50 end
+end)
+local gravBox = addTextBox(tabInicio, "Gravidade", "196.2", function(v)
+    workspace.Gravity = tonumber(v) or 196.2
+end)
+addButton(tabInicio, "Resetar", function()
+    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = 16
+        hum.JumpPower = 50
+        speedBox:Set("16")
+        jumpBox:Set("50")
+    end
+    workspace.Gravity = 196.2
+    gravBox:Set("196.2")
+end)
+
+-- ========================================
+-- POPULAR ABA JOGADOR
+-- ========================================
+addSection(tabJogador, "Habilidades")
+addToggle(tabJogador, "No Clip", false, function(v) noclip = v end)
+addToggle(tabJogador, "Pulo Infinito", false, function(v) infJump = v end)
+addToggle(tabJogador, "Invisibilidade", false, function(v)
+    invis = v
+    if LocalPlayer.Character then
+        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                part.Transparent = v
+            end
+        end
+    end
+end)
+
+-- Loops
+RunService.Stepped:Connect(function()
+    if (noclip or noclipProtect) and LocalPlayer.Character then
+        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if infJump and LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum:ChangeState("Jumping") end
+    end
+end)
+
+-- ========================================
+-- POPULAR ABA TELEPORTE
+-- ========================================
+addSection(tabTeleporte, "Locais")
+local locais = {
+    {"Hospital", CFrame.new(-309, 4, 71)},
+    {"Banco", CFrame.new(2.28, 4.65, 254.58)},
+    {"Escola", CFrame.new(-312, 4, 211)},
+    {"Praça", CFrame.new(-26, 4, -23)},
+    {"Agência", CFrame.new(179, 4, -464)},
+}
+for _, data in ipairs(locais) do
+    addButton(tabTeleporte, data[1], function()
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then root.CFrame = data[2] end
+    end)
+end
+
+addSection(tabTeleporte, "Jogadores")
+local playerList = {}
+local function atualizarLista()
+    playerList = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then table.insert(playerList, p.Name) end
+    end
+end
+atualizarLista()
+Players.PlayerAdded:Connect(atualizarLista)
+Players.PlayerRemoving:Connect(atualizarLista)
+
+-- Dropdown de jogadores
+local teleportDropdown = addDropdown(tabTeleporte, playerList, "Selecione", function(selected)
+    local target = Players:FindFirstChild(selected)
+    if target and target.Character then
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = target.Character.HumanoidRootPart.CFrame
+        end
+    end
+end)
+
+addButton(tabTeleporte, "Atualizar Lista", function()
+    atualizarLista()
+    teleportDropdown:Set(playerList)
+end)
+
+-- ========================================
+-- POPULAR ABA TROLL (completa)
+-- ========================================
+addSection(tabTroll, "Selecionar Alvo")
+local targetDropdown = addDropdown(tabTroll, {}, "Selecione", function(selected)
+    selectedTarget = Players:FindFirstChild(selected)
+end)
+
+addButton(tabTroll, "Atualizar Jogadores", function()
+    local lista = {}
+    for _, v in ipairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer then table.insert(lista, v.Name) end
+    end
+    targetDropdown:Set(lista)
+end)
+
+addToggle(tabTroll, "Visualizar Jogador", false, function(v)
+    if v then
+        if not _G.viewConn then
+            _G.viewConn = RunService.Heartbeat:Connect(function()
+                if selectedTarget and selectedTarget.Character then
+                    local hum = selectedTarget.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then Camera.CameraSubject = hum end
+                end
+            end)
+        end
+    else
+        if _G.viewConn then _G.viewConn:Disconnect(); _G.viewConn = nil end
+        if LocalPlayer.Character then
+            Camera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        end
+    end
+end)
+
+-- Métodos Matar/Puxar
+addSection(tabTroll, "Ações")
+local metodos = {"Matar", "Puxar"}
+local metodoSelecionado = "Matar"
+local metodoDropdown = addDropdown(tabTroll, metodos, "Matar", function(opt) metodoSelecionado = opt end)
+
+local function funcaoMatar()
+    while acaoAtiva and selectedTarget and selectedTarget.Character do
+        local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+        if targetRoot then targetRoot.CFrame = CFrame.new(0, -500, 0) end
+        task.wait(0.1)
+    end
+end
+
+local function funcaoPuxar()
+    local clearRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Clea1rTool1s")
+    if clearRemote then clearRemote:FireServer("ClearAllTools") end
+    task.wait(0.2)
+    local toolRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Too1l")
+    if toolRemote then toolRemote:InvokeServer("PickingTools", "Couch") end
+    task.wait(0.3)
+    local couch = LocalPlayer.Backpack:FindFirstChild("Couch")
+    if not couch then warn("Sofá não encontrado"); return end
+    couch.Parent = LocalPlayer.Character
+    task.wait(0.1)
+    local seat1 = couch:FindFirstChild("Seat1")
+    local seat2 = couch:FindFirstChild("Seat2")
+    if seat1 and seat2 then seat1.Disabled = true; seat2.Disabled = true end
+    while acaoAtiva and selectedTarget and selectedTarget.Character and couch.Parent do
+        local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+        if targetRoot and seat1 then
+            seat1.CFrame = targetRoot.CFrame * CFrame.new(0, 2, -2)
+        else break end
+        task.wait()
+    end
+    if couch and couch.Parent then couch.Parent = LocalPlayer.Backpack end
+    if clearRemote then clearRemote:FireServer("ClearAllTools") end
+end
+
+addButton(tabTroll, "Executar", function()
+    if not selectedTarget then warn("Selecione um jogador!"); return end
+    if acaoAtiva then warn("Ação em andamento. Use 'Parar'."); return end
+    acaoAtiva = true
+    if metodoSelecionado == "Matar" then
+        acaoThread = task.spawn(funcaoMatar)
+    else
+        acaoThread = task.spawn(funcaoPuxar)
+    end
+end)
+
+addButton(tabTroll, "Parar", function()
+    acaoAtiva = false
+    if acaoThread then task.cancel(acaoThread); acaoThread = nil end
+    local clearRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Clea1rTool1s")
+    if clearRemote then clearRemote:FireServer("ClearAllTools") end
+end)
+
+-- ===== PIRRALHO =====
+addSection(tabTroll, "Pirralho (Criança)")
+
+local parteMapeada = {
+    Cabeça = "Head",
+    ["Peito Superior"] = "UpperTorso",
+    ["Barriga Inferior"] = "LowerTorso",
+    ["Frente do Corpo"] = "HumanoidRootPart",
+    Frente = "HumanoidRootPart",
+    Traseiro = "HumanoidRootPart"
+}
+
+local nomesRP = {
+    "oi kkkk", "Sou Seu filho", "Armaria", "Tenho Dono: Lucas", "Estoy loco",
+    "XALALALAL", "ANALFABETO", "Criança", "Web namoro", "Veia", "DRIP CLIENT",
+    "KITA!!!!", "MÃƒEEEE", "PAIII", "BANCOPAN", "Calada", "Tenho Dona: Lolyta", "Uso Hack"
+}
+
+-- Dropdown para escolher alvo do pirralho
+local babyTargetDropdown = addDropdown(tabTroll, {}, "Selecione", function(selected)
+    chasingplayer = Players:FindFirstChild(selected)
+end)
+
+addButton(tabTroll, "Atualizar Alvos", function()
+    local lista = {}
+    for _, v in ipairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer then table.insert(lista, v.Name) end
+    end
+    babyTargetDropdown:Set(lista)
+end)
+
+-- Dropdown nome RP
+addDropdown(tabTroll, nomesRP, "Nome", function(nome)
+    local evento = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1RPNam1eTex1t")
+    if evento then evento:FireServer("RolePlayFollow", nome) end
+end)
+
+-- Dropdown parte do corpo
+addDropdown(tabTroll, {"Cabeça", "Peito Superior", "Barriga Inferior", "Frente do Corpo", "Frente", "Traseiro"}, "Parte", function(opcao)
+    parteSelecionada = parteMapeada[opcao] or "HumanoidRootPart"
+end)
+
+-- Toggle visualizar
+addToggle(tabTroll, "Visualizar Alvo", false, function(v)
+    if v then
+        if not _G.viewBabyConn then
+            _G.viewBabyConn = RunService.Heartbeat:Connect(function()
+                if chasingplayer and chasingplayer.Character then
+                    local hum = chasingplayer.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then Camera.CameraSubject = hum end
+                end
+            end)
+        end
+    else
+        if _G.viewBabyConn then _G.viewBabyConn:Disconnect(); _G.viewBabyConn = nil end
+        if LocalPlayer.Character then
+            Camera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        end
+    end
+end)
+
+-- Botão enviar pirralho
+addButton(tabTroll, "Enviar Pirralho", function()
+    if not chasingplayer then warn("Selecione um jogador!"); return end
+    local targetChar = workspace:FindFirstChild(chasingplayer.Name)
+    if not targetChar then warn("Jogador não encontrado no workspace."); return end
+    if not workspace:FindFirstChild(LocalPlayer.Name) or not workspace[LocalPlayer.Name]:FindFirstChild("FollowCharacter") then
+        local babyRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Bab1yFollo1w")
+        if babyRemote then
+            babyRemote:FireServer("CharacterFollowSpawnPlayer", "BabyBoy")
+            task.wait(0.3)
+        else
+            warn("Remote da criança não encontrado.")
+            return
+        end
+    end
+    local pirralho = workspace[LocalPlayer.Name] and workspace[LocalPlayer.Name]:FindFirstChild("FollowCharacter")
+    local parteAlvo = targetChar:FindFirstChild(parteSelecionada)
+    if pirralho and parteAlvo then
+        pirralho.Parent = targetChar
+        if babyConn then babyConn:Disconnect(); babyConn = nil end
+        babyConn = RunService.Heartbeat:Connect(function()
+            if pirralho and pirralho:FindFirstChild("Torso") and parteAlvo and parteAlvo.Parent then
+                pirralho.Torso.BodyPosition.Position = parteAlvo.Position
+                pirralho.Torso.BodyGyro.CFrame = parteAlvo.CFrame
+            else
+                if babyConn then babyConn:Disconnect(); babyConn = nil end
+            end
+        end)
+    else
+        warn("Parte '" .. parteSelecionada .. "' não encontrada no alvo.")
+    end
+end)
+
+addButton(tabTroll, "Remover Pirralho", function()
+    if babyConn then babyConn:Disconnect(); babyConn = nil end
+    local pirralho = workspace:FindFirstChild(LocalPlayer.Name) and workspace[LocalPlayer.Name]:FindFirstChild("FollowCharacter")
+    if pirralho then pirralho:Destroy() end
+end)
+
+-- ========================================
+-- POPULAR ABA ÁUDIO
+-- ========================================
+addSection(tabAudio, "Tocar Áudio")
+local audioBox = addTextBox(tabAudio, "ID do áudio", "9120655258", function() end)
+addButton(tabAudio, "Tocar", function()
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://" .. audioBox:GetText()
+    sound.Parent = workspace
+    sound:Play()
+    game:GetService("Debris"):AddItem(sound, 10)
+end)
+
+addSection(tabAudio, "Músicas Prontas")
+local musicas = {
+    {"Phonk", "9120655258"},
+    {"Samba", "1836175030"},
+    {"Funk", "8080255618"},
+}
+for _, m in ipairs(musicas) do
+    addButton(tabAudio, m[1], function()
+        local sound = Instance.new("Sound")
+        sound.SoundId = "rbxassetid://" .. m[2]
+        sound.Parent = workspace
+        sound:Play()
+        game:GetService("Debris"):AddItem(sound, 10)
+    end)
+end
+
+-- ========================================
+-- POPULAR ABA CONFIG
+-- ========================================
+addSection(tabConfig, "Reset")
+addButton(tabConfig, "Resetar Personagem", function()
+    if LocalPlayer.Character then LocalPlayer.Character:BreakJoints() end
+end)
+addButton(tabConfig, "Reentrar no Servidor", function()
+    game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+end)
+
+-- ========================================
+-- POPULAR ABA PROTEÇÃO
+-- ========================================
+addSection(tabProtecao, "Proteções")
+addToggle(tabProtecao, "No Clip", false, function(v) noclipProtect = v end)
+addToggle(tabProtecao, "Void Protection", false, function(v)
+    if v then
+        if not _G.voidConn then
+            _G.voidConn = RunService.Heartbeat:Connect(function()
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    if LocalPlayer.Character.HumanoidRootPart.Position.Y < -50 then
+                        LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0, 50, 0)
+                    end
+                end
+            end)
+        end
+    else
+        if _G.voidConn then _G.voidConn:Disconnect(); _G.voidConn = nil end
+    end
+end)
+addToggle(tabProtecao, "Anti Sit", false, function() end) -- função vazia
+addToggle(tabProtecao, "Anti Fling", false, function(v)
+    if v then
+        if not _G.flingConn then
+            _G.flingConn = RunService.Heartbeat:Connect(function()
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local hrp = LocalPlayer.Character.HumanoidRootPart
+                    if hrp.Velocity.Magnitude > 200 then
+                        hrp.Velocity = Vector3.new(0, 0, 0)
+                        hrp.Anchored = true
+                        task.wait(0.1)
+                        hrp.Anchored = false
+                    end
+                end
+            end)
+        end
+    else
+        if _G.flingConn then _G.flingConn:Disconnect(); _G.flingConn = nil end
+    end
+end)
+addToggle(tabProtecao, "Anti Flashbang", false, function(v)
+    if v then
+        if not _G.flashConn then
+            _G.flashConn = RunService.Stepped:Connect(function()
+                for _, obj in ipairs(workspace.CurrentCamera:GetChildren()) do
+                    if obj:IsA("BasePart") and obj.Name == "water" then obj:Destroy() end
+                end
+            end)
+        end
+    else
+        if _G.flashConn then _G.flashConn:Disconnect(); _G.flashConn = nil end
+    end
+end)
+addToggle(tabProtecao, "Anti Lag", false, function(v)
+    if v then
+        if not _G.lagConn then
+            _G.lagConn = task.spawn(function()
+                while v do
+                    task.wait(2)
+                    if LocalPlayer.Character then
+                        for _, item in ipairs(LocalPlayer.Character:GetChildren()) do
+                            if (item:IsA("Tool") or item:IsA("Accessory")) and item.Name:match("Phone|Ball|Taser") then
+                                item:Destroy()
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    else
+        if _G.lagConn then task.cancel(_G.lagConn); _G.lagConn = nil end
+    end
+end)
+
+-- Função minimizar
+local minimized = false
+local originalSize = main.Size
+minimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        for _, btn in ipairs(tabs) do btn.Visible = false end
+        for _, frame in ipairs(tabFrames) do frame.Visible = false end
+        main.Size = UDim2.new(0, 700, 0, 30)
+        minimizeBtn.Text = "+"
+    else
+        for _, btn in ipairs(tabs) do btn.Visible = true end
+        for i, frame in ipairs(tabFrames) do frame.Visible = (i == 1) end -- só a primeira visível
+        main.Size = originalSize
+        minimizeBtn.Text = "-"
+    end
+end)
+
+print("Mz Hub completo carregado!")
