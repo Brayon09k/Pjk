@@ -1,4 +1,4 @@
--- ==================== SCRIPT PRINCIPAL (VISUAL ORIGINAL + CORREÇÕES) ====================
+-- ==================== SCRIPT PRINCIPAL (CORRIGIDO: MORTE/RENASCIMENTO) ====================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
@@ -13,13 +13,12 @@ local BASE_B = 255
 local cfg = {
     ESP = false, AimbotMode = "None", FOV = false, 
     FOVSize = 100, FOVPos = 0, SafeTeam = false,
-    LEDActive = false, LEDSpeed = 1,   -- velocidade mínima 1
+    LEDActive = false, LEDSpeed = 1,
     TargetPart = "Head",
-    Transparency = 0,                  -- opaco no início
-    R = 0, G = 0, B = 0                -- sliders começam em 0 (cor original)
+    Transparency = 0,
+    R = 0, G = 0, B = 0
 }
 
--- Calcula a cor real a partir dos sliders (quanto maior o slider, mais escuro)
 local function getRealColor()
     local r = math.max(0, BASE_R - cfg.R)
     local g = math.max(0, BASE_G - cfg.G)
@@ -45,7 +44,111 @@ local function createTracer()
     line.Visible = false
     return line
 end
+
 local tracers = {}
+local highlights = {}
+
+-- Função para limpar ESP de um jogador
+local function clearESP(player)
+    local line = tracers[player]
+    if line then
+        line.Visible = false
+    end
+    local hl = highlights[player]
+    if hl then
+        pcall(function() hl:Destroy() end)
+        highlights[player] = nil
+    end
+end
+
+-- Função para criar/atualizar ESP de um jogador
+local function updateESP(player, color)
+    local char = player.Character
+    local isTeammate = (player.Team == LocalPlayer.Team)
+    local line = tracers[player]
+    if not line then
+        line = createTracer()
+        tracers[player] = line
+    end
+    
+    if not cfg.ESP then
+        line.Visible = false
+        return
+    end
+    
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local humanoid = char:FindFirstChild("Humanoid")
+        local isAlive = humanoid and humanoid.Health > 0
+        if not isAlive then
+            clearESP(player)
+            return
+        end
+        
+        local root = char.HumanoidRootPart
+        local pos, vis = Camera:WorldToViewportPoint(root.Position)
+        local hl = highlights[player]
+        
+        if not (cfg.SafeTeam and isTeammate) then
+            if not hl then
+                hl = Instance.new("Highlight")
+                hl.Name = "MzHighlight"
+                hl.Parent = char
+                highlights[player] = hl
+            end
+            hl.FillColor = isTeammate and Color3.new(0,1,0) or color
+            hl.Enabled = true
+            if vis then
+                line.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                line.To = Vector2.new(pos.X, pos.Y)
+                line.Color = isTeammate and Color3.new(0,1,0) or color
+                line.Visible = true
+            else
+                line.Visible = false
+            end
+        else
+            if hl then
+                hl:Destroy()
+                highlights[player] = nil
+            end
+            line.Visible = false
+        end
+    else
+        clearESP(player)
+    end
+end
+
+-- Monitorar renascimento
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(function(char)
+            -- Pequeno delay para garantir que o personagem está pronto
+            task.wait(0.1)
+            -- O highlight será recriado no próximo frame
+        end)
+        player.CharacterRemoving:Connect(function()
+            clearESP(player)
+        end)
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(function(char)
+            task.wait(0.1)
+        end)
+        player.CharacterRemoving:Connect(function()
+            clearESP(player)
+        end)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    clearESP(player)
+    if tracers[player] then
+        tracers[player]:Remove()
+        tracers[player] = nil
+    end
+end)
 
 -- --- ARRASTAR ---
 local function makeDraggable(topbar, object)
@@ -180,7 +283,6 @@ local function addTargetBtn(name, part, p)
     RunService.RenderStepped:Connect(function() b.TextColor3 = (cfg.TargetPart == part) and Color3.new(1,1,0) or Color3.new(1,1,1) end)
 end
 
--- Stepper com MouseButton1Down
 local function addStepper(name, key, min, max, p, step, isDecimal)
     local f = Instance.new("Frame", p); f.Size = UDim2.new(0.95, 0, 0, 50); f.BackgroundTransparency = 1
     if p == cAju then f.LayoutOrder = orderAju; orderAju = orderAju + 1 end
@@ -232,7 +334,6 @@ addTargetBtn("BRAÇO DIREITO", "RightArm", cFun)
 addTargetBtn("BRAÇO ESQUERDO", "LeftArm", cFun)
 addTargetBtn("PERNAS", "Legs", cFun)
 
--- Ajustes (valores iniciais zero ou mínimo)
 addStepper("TAMANHO FOV", "FOVSize", 10, 800, cAju, 10)
 addStepper("ALINHADOR FOV", "FOVPos", -300, 300, cAju, 5)
 addStepper("TRANSPARÊNCIA", "Transparency", 0, 0.9, cAju, 0.05, true)
@@ -241,9 +342,8 @@ addStepper("COR R", "R", 0, 255, cAju, 5)
 addStepper("COR G", "G", 0, 255, cAju, 5)
 addStepper("COR B", "B", 0, 255, cAju, 5)
 
--- Créditos
 addCreditText("Executor: Delta", cCre)
-addCreditText("Versão do Hub: 5.0", cCre)
+addCreditText("Versão do Hub: 5.1", cCre)
 addCreditText("Criadores: Mz Studio", cCre)
 addCreditText("Créditos: Mz mod", cCre)
 
@@ -283,22 +383,20 @@ RunService.RenderStepped:Connect(function()
     fovFrame.Size = UDim2.new(0, cfg.FOVSize*2, 0, cfg.FOVSize*2)
     fovFrame.Position = UDim2.new(0.5, -cfg.FOVSize, 0.5, -cfg.FOVSize + cfg.FOVPos)
 
-    -- Cor fixa do fundo (baseada nos sliders R,G,B)
+    -- Cores
     local bgColor = getRealColor()
-    -- Fundo escurecido (multiplica por 0.15) - visual original
     local darkBg = Color3.new(bgColor.R * 0.15, bgColor.G * 0.15, bgColor.B * 0.15)
     main.BackgroundColor3 = darkBg
     confirmFrame.BackgroundColor3 = darkBg
     main.BackgroundTransparency = cfg.Transparency
     confirmFrame.BackgroundTransparency = cfg.Transparency
 
-    -- Cor das bordas e título
     local borderColor
     if cfg.LEDActive then
         local hue = (tick() * (cfg.LEDSpeed / 10)) % 1
         borderColor = Color3.fromHSV(hue, 1, 1)
     else
-        borderColor = bgColor  -- mesma cor base (não escurecida)
+        borderColor = bgColor
     end
     
     fovStroke.Color = borderColor
@@ -307,61 +405,51 @@ RunService.RenderStepped:Connect(function()
     cStroke.Color = borderColor
     title.TextColor3 = borderColor
 
-    -- ESP e Aimbot (usa a mesma cor das bordas)
-    local espColor = borderColor
+    -- Atualiza ESP para cada jogador
+    if cfg.ESP then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                updateESP(player, borderColor)
+            end
+        end
+    else
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                clearESP(player)
+            end
+        end
+    end
+
+    -- Aimbot
     local target = nil
     local dist = cfg.FOVSize
     local center = Vector2.new(Camera.ViewportSize.X/2, (Camera.ViewportSize.Y/2) + cfg.FOVPos)
     
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            local char = p.Character
-            local isTeammate = (p.Team == LocalPlayer.Team)
-            local line = tracers[p] or createTracer()
-            tracers[p] = line
-            
-            if not cfg.ESP then line.Visible = false end
-            
-            if cfg.ESP and char and char:FindFirstChild("HumanoidRootPart") then
-                local root = char.HumanoidRootPart
-                local pos, vis = Camera:WorldToViewportPoint(root.Position)
-                local hl = char:FindFirstChild("MzHighlight")
-                
-                if not (cfg.SafeTeam and isTeammate) then
-                    if not hl then hl = Instance.new("Highlight", char); hl.Name = "MzHighlight" end
-                    hl.FillColor = isTeammate and Color3.new(0,1,0) or espColor
-                    hl.Enabled = true
-                    if vis then
-                        line.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-                        line.To = Vector2.new(pos.X, pos.Y)
-                        line.Color = isTeammate and Color3.new(0,1,0) or espColor
-                        line.Visible = true
-                    else line.Visible = false end
-                else
-                    if hl then hl:Destroy() end
-                    line.Visible = false
-                end
-            else
-                local hl = char and char:FindFirstChild("MzHighlight")
-                if hl then hl:Destroy() end
-                line.Visible = false
-            end
-            
-            if cfg.AimbotMode ~= "None" and cfg.FOV and char and not (cfg.SafeTeam and isTeammate) then
-                local part = getPrecisePart(char, cfg.TargetPart)
-                if part then
-                    local pos, vis = Camera:WorldToViewportPoint(part.Position)
-                    if vis then
-                        local mDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                        if mDist <= cfg.FOVSize and mDist < dist then
-                            dist = mDist
-                            target = part
+    if cfg.AimbotMode ~= "None" and cfg.FOV then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local char = player.Character
+                local isTeammate = (player.Team == LocalPlayer.Team)
+                if char and not (cfg.SafeTeam and isTeammate) then
+                    local humanoid = char:FindFirstChild("Humanoid")
+                    if humanoid and humanoid.Health > 0 then
+                        local part = getPrecisePart(char, cfg.TargetPart)
+                        if part then
+                            local pos, vis = Camera:WorldToViewportPoint(part.Position)
+                            if vis then
+                                local mDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                                if mDist <= cfg.FOVSize and mDist < dist then
+                                    dist = mDist
+                                    target = part
+                                end
+                            end
                         end
                     end
                 end
             end
         end
     end
+    
     if target then
         Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, target.Position), (cfg.AimbotMode == "Forte" and 1 or 0.15))
     end
@@ -369,7 +457,15 @@ end)
 
 btnClose.MouseButton1Click:Connect(function() confirmFrame.Visible = true end)
 bNao.MouseButton1Click:Connect(function() confirmFrame.Visible = false end)
-bSim.MouseButton1Click:Connect(function() for _, l in pairs(tracers) do l:Remove() end; mainGui:Destroy() end)
+bSim.MouseButton1Click:Connect(function() 
+    for _, line in pairs(tracers) do 
+        pcall(function() line:Remove() end)
+    end
+    for _, hl in pairs(highlights) do
+        pcall(function() hl:Destroy() end)
+    end
+    mainGui:Destroy() 
+end)
 
 btnMin.MouseButton1Click:Connect(function()
     if main.Size.Y.Offset == 480 then
