@@ -1,23 +1,39 @@
--- ==================== SCRIPT PRINCIPAL (CORRIGIDO: MORTE/RENASCIMENTO) ====================
+-- ==================== SCRIPT PRINCIPAL (Mz URIEL - GIRO RÁPIDO, GIRAR NA ABA FUNÇÕES) ====================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- COR BASE DO HUB (quando sliders estão em 0)
-local BASE_R = 210
-local BASE_G = 255
-local BASE_B = 255
+-- COR BASE DO HUB (vermelho puro)
+local BASE_R = 255
+local BASE_G = 0
+local BASE_B = 0
 
--- Configurações (valores iniciais corrigidos)
+-- Configurações
 local cfg = {
     ESP = false, AimbotMode = "None", FOV = false, 
     FOVSize = 100, FOVPos = 0, SafeTeam = false,
     LEDActive = false, LEDSpeed = 1,
     TargetPart = "Head",
     Transparency = 0,
-    R = 0, G = 0, B = 0
+    R = 0, G = 0, B = 0,
+    Spin = false   -- toggle de giro agora na aba FUNÇÕES
 }
+
+-- Controle do giro (velocidade: 15 graus por frame)
+local spinConnection = nil
+local function startSpin()
+    if spinConnection then spinConnection:Disconnect() end
+    spinConnection = RunService.RenderStepped:Connect(function()
+        if cfg.Spin and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = LocalPlayer.Character.HumanoidRootPart
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(15), 0)
+        end
+    end)
+end
+local function stopSpin()
+    if spinConnection then spinConnection:Disconnect() spinConnection = nil end
+end
 
 local function getRealColor()
     local r = math.max(0, BASE_R - cfg.R)
@@ -48,7 +64,6 @@ end
 local tracers = {}
 local highlights = {}
 
--- Função para limpar ESP de um jogador
 local function clearESP(player)
     local line = tracers[player]
     if line then
@@ -61,7 +76,6 @@ local function clearESP(player)
     end
 end
 
--- Função para criar/atualizar ESP de um jogador
 local function updateESP(player, color)
     local char = player.Character
     local isTeammate = (player.Team == LocalPlayer.Team)
@@ -121,9 +135,7 @@ end
 for _, player in pairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
         player.CharacterAdded:Connect(function(char)
-            -- Pequeno delay para garantir que o personagem está pronto
             task.wait(0.1)
-            -- O highlight será recriado no próximo frame
         end)
         player.CharacterRemoving:Connect(function()
             clearESP(player)
@@ -179,7 +191,7 @@ local function makeDraggable(topbar, object)
 end
 
 local mainGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
-mainGui.Name = "MzHub_V48_FixEspaco"
+mainGui.Name = "MzUrielHub"
 mainGui.ResetOnSpawn = false
 
 -- FOV
@@ -222,7 +234,7 @@ local bNao = Instance.new("TextButton", confirmFrame); bNao.Size = UDim2.new(0, 
 
 -- BARRA DE TOPO
 local top = Instance.new("Frame", main); top.Size = UDim2.new(1, 0, 0, 40); top.BackgroundTransparency = 1
-local title = Instance.new("TextLabel", top); title.Size = UDim2.new(1, -70, 1, 0); title.Position = UDim2.new(0, 10, 0, 0); title.Text = "Mz Hub 😈"; title.Font = "SourceSansBold"; title.TextSize = 20; title.BackgroundTransparency = 1; title.TextXAlignment = "Left"
+local title = Instance.new("TextLabel", top); title.Size = UDim2.new(1, -70, 1, 0); title.Position = UDim2.new(0, 10, 0, 0); title.Text = "Mz URIEL"; title.Font = "SourceSansBold"; title.TextSize = 20; title.BackgroundTransparency = 1; title.TextXAlignment = "Left"
 title.TextColor3 = Color3.fromRGB(255,255,255)
 local btnMin = Instance.new("TextButton", top); btnMin.Size = UDim2.new(0, 30, 0, 30); btnMin.Position = UDim2.new(1, -70, 0.5, -15); btnMin.Text = "-"; btnMin.BackgroundColor3 = Color3.fromRGB(0, 0, 0); btnMin.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", btnMin).CornerRadius = UDim.new(0, 6)
 local btnClose = Instance.new("TextButton", top); btnClose.Size = UDim2.new(0, 30, 0, 30); btnClose.Position = UDim2.new(1, -35, 0.5, -15); btnClose.Text = "X"; btnClose.BackgroundColor3 = Color3.fromRGB(180, 0, 0); btnClose.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", btnClose).CornerRadius = UDim.new(0, 6)
@@ -265,9 +277,13 @@ bT3.MouseButton1Click:Connect(function() cFun.Visible = false; cAju.Visible = fa
 local function addToggle(name, id, p)
     local b = Instance.new("TextButton", p); b.Size = UDim2.new(0.95, 0, 0, 38); b.BackgroundColor3 = Color3.fromRGB(22,22,22); b.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
     if p == cFun then b.LayoutOrder = orderFun; orderFun = orderFun + 1 end
+    if p == cAju then b.LayoutOrder = orderAju; orderAju = orderAju + 1 end
     b.MouseButton1Click:Connect(function()
         if id == "AimbotForte" then cfg.AimbotMode = (cfg.AimbotMode == "Forte") and "None" or "Forte"
         elseif id == "AimbotFraco" then cfg.AimbotMode = (cfg.AimbotMode == "Fraco") and "None" or "Fraco"
+        elseif id == "Spin" then 
+            cfg.Spin = not cfg.Spin
+            if cfg.Spin then startSpin() else stopSpin() end
         else cfg[id] = not cfg[id] end
     end)
     RunService.RenderStepped:Connect(function()
@@ -314,12 +330,14 @@ local function addCreditText(text, p)
 end
 
 -- ========== CONSTRUÇÃO DO MENU ==========
+-- ABA FUNÇÕES
 addToggle("ESP + LINHAS", "ESP", cFun)
 addToggle("AIMBOT FORTE", "AimbotForte", cFun)
 addToggle("AIMBOT FRACO", "AimbotFraco", cFun)
 addToggle("MOSTRAR FOV", "FOV", cFun)
 addToggle("IGNORAR TIME", "SafeTeam", cFun)
 addToggle("LED RGB", "LEDActive", cFun)
+addToggle("GIRAR", "Spin", cFun)   -- <--- GIRAR movido para cá, abaixo do LED RGB
 
 local infoFrame = Instance.new("Frame", cFun)
 infoFrame.LayoutOrder = orderFun; orderFun = orderFun + 1
@@ -334,6 +352,7 @@ addTargetBtn("BRAÇO DIREITO", "RightArm", cFun)
 addTargetBtn("BRAÇO ESQUERDO", "LeftArm", cFun)
 addTargetBtn("PERNAS", "Legs", cFun)
 
+-- ABA AJUSTES
 addStepper("TAMANHO FOV", "FOVSize", 10, 800, cAju, 10)
 addStepper("ALINHADOR FOV", "FOVPos", -300, 300, cAju, 5)
 addStepper("TRANSPARÊNCIA", "Transparency", 0, 0.9, cAju, 0.05, true)
@@ -342,8 +361,9 @@ addStepper("COR R", "R", 0, 255, cAju, 5)
 addStepper("COR G", "G", 0, 255, cAju, 5)
 addStepper("COR B", "B", 0, 255, cAju, 5)
 
+-- ABA CRÉDITOS
 addCreditText("Executor: Delta", cCre)
-addCreditText("Versão do Hub: 5.1", cCre)
+addCreditText("Versão do Hub: 5.2", cCre)
 addCreditText("Criadores: Mz Studio", cCre)
 addCreditText("Créditos: Mz mod", cCre)
 
@@ -378,12 +398,10 @@ end)
 
 -- ========== LOOP PRINCIPAL ==========
 RunService.RenderStepped:Connect(function()
-    -- FOV
     fovFrame.Visible = cfg.FOV
     fovFrame.Size = UDim2.new(0, cfg.FOVSize*2, 0, cfg.FOVSize*2)
     fovFrame.Position = UDim2.new(0.5, -cfg.FOVSize, 0.5, -cfg.FOVSize + cfg.FOVPos)
 
-    -- Cores
     local bgColor = getRealColor()
     local darkBg = Color3.new(bgColor.R * 0.15, bgColor.G * 0.15, bgColor.B * 0.15)
     main.BackgroundColor3 = darkBg
@@ -405,7 +423,6 @@ RunService.RenderStepped:Connect(function()
     cStroke.Color = borderColor
     title.TextColor3 = borderColor
 
-    -- Atualiza ESP para cada jogador
     if cfg.ESP then
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer then
@@ -420,7 +437,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Aimbot
     local target = nil
     local dist = cfg.FOVSize
     local center = Vector2.new(Camera.ViewportSize.X/2, (Camera.ViewportSize.Y/2) + cfg.FOVPos)
@@ -464,6 +480,7 @@ bSim.MouseButton1Click:Connect(function()
     for _, hl in pairs(highlights) do
         pcall(function() hl:Destroy() end)
     end
+    stopSpin()
     mainGui:Destroy() 
 end)
 
@@ -474,3 +491,5 @@ btnMin.MouseButton1Click:Connect(function()
         main.Size = UDim2.new(0, 280, 0, 480)
     end
 end)
+
+stopSpin()
