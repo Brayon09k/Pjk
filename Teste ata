@@ -1,0 +1,971 @@
+-- ==================== SCRIPT PRINCIPAL (Mz URIEL v6.3) ====================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- COR BASE DO HUB (vermelho puro)
+local BASE_R = 255
+local BASE_G = 0
+local BASE_B = 0
+
+-- Configurações
+local cfg = {
+    ESP = false, AimbotMode = "None", FOV = false, 
+    FOVSize = 100, FOVPos = 0, SafeTeam = false,
+    LEDActive = false, LEDSpeed = 1,
+    TargetPart = "Head",
+    Transparency = 0,
+    R = 0, G = 0, B = 0,
+    Spin = false,
+    -- PROTEÇÃO
+    AntiKick = true,
+    AntiAFK = true,
+    AutoReconnect = true,
+    AntiScreenshot = true,
+    Stealth = false,
+    _antiKickHooked = false,
+    _rejoining = false,
+    _kickCount = 0,
+    _screenshotHud = nil
+}
+
+-- Controle do giro (velocidade: 15 graus por frame)
+local spinConnection = nil
+local function startSpin()
+    if spinConnection then spinConnection:Disconnect() end
+    spinConnection = RunService.RenderStepped:Connect(function()
+        if cfg.Spin and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = LocalPlayer.Character.HumanoidRootPart
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(15), 0)
+        end
+    end)
+end
+local function stopSpin()
+    if spinConnection then spinConnection:Disconnect() spinConnection = nil end
+end
+
+local function getRealColor()
+    local r = math.max(0, BASE_R - cfg.R)
+    local g = math.max(0, BASE_G - cfg.G)
+    local b = math.max(0, BASE_B - cfg.B)
+    return Color3.fromRGB(r, g, b)
+end
+
+-- --- BUSCA DE PARTES ---
+local function getPrecisePart(char, partName)
+    if partName == "Head" then return char:FindFirstChild("Head") 
+    elseif partName == "Torso" then return char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+    elseif partName == "RightArm" then return char:FindFirstChild("RightUpperArm") or char:FindFirstChild("Right Arm")
+    elseif partName == "LeftArm" then return char:FindFirstChild("LeftUpperArm") or char:FindFirstChild("Left Arm")
+    elseif partName == "Legs" then return char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("Right Leg") end
+    return nil
+end
+
+-- --- CÂMERA ---
+local function getCam()
+    local cam = workspace.CurrentCamera
+    if cam then Camera = cam end
+    return Camera
+end
+
+-- --- LINHAS (com fallback se o executor não tiver Drawing) ---
+local hasDrawing = pcall(function()
+    local l = Drawing.new("Line")
+    l:Remove()
+end)
+
+local function createTracer()
+    if not hasDrawing then return nil end
+    local ok, line = pcall(function() return Drawing.new("Line") end)
+    if not ok or not line then
+        hasDrawing = false
+        return nil
+    end
+    line.Thickness = 1.5
+    line.Transparency = 1
+    line.Visible = false
+    return line
+end
+
+local tracers = {}
+local highlights = {}
+
+local function clearESP(player)
+    local line = tracers[player]
+    if line then
+        pcall(function() line.Visible = false end)
+    end
+    local hl = highlights[player]
+    if hl then
+        pcall(function() hl:Destroy() end)
+        highlights[player] = nil
+    end
+end
+
+local function updateESP(player, color, cam)
+    local char = player.Character
+    local isTeammate = (player.Team == LocalPlayer.Team)
+    local line = tracers[player]
+
+    if not cfg.ESP then
+        if line then line.Visible = false end
+        return
+    end
+
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local humanoid = char:FindFirstChild("Humanoid")
+        local isAlive = humanoid and humanoid.Health > 0
+        if not isAlive then
+            clearESP(player)
+            return
+        end
+
+        local root = char.HumanoidRootPart
+        local pos, vis = cam:WorldToViewportPoint(root.Position)
+        local hl = highlights[player]
+
+        if not (cfg.SafeTeam and isTeammate) then
+            if not hl then
+                local ok, newHl = pcall(function()
+                    local h = Instance.new("Highlight")
+                    h.Name = "MzHighlight"
+                    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    h.Parent = char
+                    return h
+                end)
+                if ok and newHl then hl = newHl; highlights[player] = hl end
+            end
+            if hl then
+                hl.FillColor = isTeammate and Color3.new(0,1,0) or color
+                hl.OutlineColor = Color3.new(0, 0, 0)
+                hl.Enabled = true
+            end
+            if hasDrawing then
+                if not line then
+                    line = createTracer()
+                    if line then tracers[player] = line end
+                end
+                if line then
+                    if vis then
+                        line.From = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y)
+                        line.To = Vector2.new(pos.X, pos.Y)
+                        line.Color = isTeammate and Color3.new(0,1,0) or color
+                        line.Visible = true
+                    else
+                        line.Visible = false
+                    end
+                end
+            end
+        else
+            if hl then
+                hl:Destroy()
+                highlights[player] = nil
+            end
+            if line then line.Visible = false end
+        end
+    else
+        clearESP(player)
+    end
+end
+
+-- Monitorar renascimento
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        player.CharacterRemoving:Connect(function()
+            clearESP(player)
+        end)
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        player.CharacterRemoving:Connect(function()
+            clearESP(player)
+        end)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    clearESP(player)
+    local line = tracers[player]
+    if line then
+        pcall(function() line:Remove() end)
+        tracers[player] = nil
+    end
+end)
+
+-- --- ARRASTAR ---
+local function makeDraggable(topbar, object)
+    local dragging, dragInput, dragStart, startPos
+    topbar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = object.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    topbar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    RunService.RenderStepped:Connect(function()
+        if dragging and dragInput then
+            local delta = dragInput.Position - dragStart
+            object.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- ==================== PALETA ====================
+local NEON      = Color3.fromRGB(0, 235, 75)
+local NEON_DIM  = Color3.fromRGB(0, 140, 45)
+local ROW_BG    = Color3.fromRGB(13, 17, 13)
+local PANEL_BG  = Color3.fromRGB(4, 6, 4)
+
+local mainGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+mainGui.Name = "MzUrielHub"
+mainGui.ResetOnSpawn = false
+mainGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+
+-- FOV
+local fovFrame = Instance.new("Frame", mainGui)
+fovFrame.BackgroundTransparency = 1; fovFrame.Visible = false
+local fovStroke = Instance.new("UIStroke", fovFrame); fovStroke.Thickness = 1.5
+local fovCorner = Instance.new("UICorner", fovFrame); fovCorner.CornerRadius = UDim.new(1, 0)
+
+-- BOLINHA FLUTUANTE
+local bubble = Instance.new("ImageButton", mainGui)
+bubble.Size = UDim2.new(0, 60, 0, 60); bubble.Position = UDim2.new(0.5, -30, 0.5, -30)
+bubble.BackgroundColor3 = Color3.fromRGB(20, 20, 20); bubble.Image = "rbxassetid://81545220272311"; bubble.ZIndex = 1000
+Instance.new("UICorner", bubble).CornerRadius = UDim.new(1, 0)
+local bStroke = Instance.new("UIStroke", bubble); bStroke.Thickness = 2
+makeDraggable(bubble, bubble)
+
+-- PAINEL PRINCIPAL
+local main = Instance.new("Frame", mainGui)
+main.Size = UDim2.new(0, 400, 0, 290)
+main.Position = UDim2.new(0.5, -200, 0.5, -145)
+main.BackgroundColor3 = PANEL_BG
+main.Visible = false
+main.ClipsDescendants = true
+main.BorderSizePixel = 0
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 14)
+local mStroke = Instance.new("UIStroke", main); mStroke.Thickness = 2; mStroke.Color = NEON
+makeDraggable(main, main)
+
+-- BRILHO INFERIOR
+local glow = Instance.new("Frame", main)
+glow.Size = UDim2.new(1, 0, 0, 46); glow.Position = UDim2.new(0, 0, 1, -46)
+glow.BackgroundColor3 = NEON; glow.BorderSizePixel = 0; glow.ZIndex = 1
+local glowGrad = Instance.new("UIGradient", glow)
+glowGrad.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 1),
+    NumberSequenceKeypoint.new(1, 0.82)
+})
+glowGrad.Rotation = 90
+
+-- CONFIRMAÇÃO
+local confirmFrame = Instance.new("Frame", mainGui)
+confirmFrame.Size = UDim2.new(0, 250, 0, 128); confirmFrame.Position = UDim2.new(0.5, -125, 0.5, -64)
+confirmFrame.BackgroundColor3 = PANEL_BG
+confirmFrame.Visible = false
+confirmFrame.ZIndex = 10000
+Instance.new("UICorner", confirmFrame).CornerRadius = UDim.new(0, 12)
+local cStroke = Instance.new("UIStroke", confirmFrame); cStroke.Thickness = 2; cStroke.Color = NEON
+local cText = Instance.new("TextLabel", confirmFrame)
+cText.Size = UDim2.new(1, 0, 0, 50); cText.Position = UDim2.new(0, 0, 0, 10); cText.Text = "Você deseja fechar o painel?"; cText.TextColor3 = Color3.new(1,1,1); cText.BackgroundTransparency = 1; cText.Font = "SourceSansBold"; cText.TextSize = 16; cText.ZIndex = 10001
+local bSim = Instance.new("TextButton", confirmFrame); bSim.Size = UDim2.new(0, 100, 0, 42); bSim.Position = UDim2.new(0.08, 0, 0.52, 0); bSim.Text = "SIM"; bSim.BackgroundColor3 = Color3.fromRGB(0, 130, 0); bSim.TextColor3 = Color3.new(1,1,1); bSim.Font = "SourceSansBold"; bSim.TextSize = 17; bSim.ZIndex = 10001; Instance.new("UICorner", bSim).CornerRadius = UDim.new(0, 8)
+local bNao = Instance.new("TextButton", confirmFrame); bNao.Size = UDim2.new(0, 100, 0, 42); bNao.Position = UDim2.new(0.52, 0, 0.52, 0); bNao.Text = "NÃO"; bNao.BackgroundColor3 = Color3.fromRGB(150, 0, 0); bNao.TextColor3 = Color3.new(1,1,1); bNao.Font = "SourceSansBold"; bNao.TextSize = 17; bNao.ZIndex = 10001; Instance.new("UICorner", bNao).CornerRadius = UDim.new(0, 8)
+
+-- BARRA DE TOPO
+local top = Instance.new("Frame", main); top.Size = UDim2.new(1, 0, 0, 46); top.BackgroundTransparency = 1; top.ZIndex = 3
+local crown = Instance.new("TextLabel", top)
+crown.Size = UDim2.new(0, 34, 0, 34); crown.Position = UDim2.new(0, 14, 0, 6)
+crown.BackgroundTransparency = 1; crown.Text = "♛"; crown.Font = "SourceSansBold"; crown.TextSize = 26
+crown.TextColor3 = NEON; crown.TextXAlignment = "Center"; crown.ZIndex = 4
+local crownStroke = Instance.new("UIStroke", crown); crownStroke.Color = NEON; crownStroke.Thickness = 1
+local title = Instance.new("TextLabel", top)
+title.Size = UDim2.new(1, -170, 1, 0); title.Position = UDim2.new(0, 52, 0, 0)
+title.Text = "Mz URIEL"; title.Font = "SourceSansBold"; title.TextSize = 24
+title.BackgroundTransparency = 1; title.TextXAlignment = "Left"; title.ZIndex = 4
+title.TextColor3 = NEON
+local titleStroke = Instance.new("UIStroke", title); titleStroke.Color = NEON; titleStroke.Thickness = 1; titleStroke.Transparency = 0.5
+
+local btnMin = Instance.new("TextButton", top)
+btnMin.Size = UDim2.new(0, 30, 0, 30); btnMin.Position = UDim2.new(1, -78, 0.5, -15)
+btnMin.Text = "_"; btnMin.BackgroundTransparency = 1; btnMin.TextColor3 = Color3.new(1,1,1)
+btnMin.Font = "SourceSansBold"; btnMin.TextSize = 22; btnMin.ZIndex = 4; btnMin.TextYAlignment = "Top"
+
+local btnClose = Instance.new("TextButton", top)
+btnClose.Size = UDim2.new(0, 30, 0, 30); btnClose.Position = UDim2.new(1, -42, 0.5, -15)
+btnClose.Text = "✕"; btnClose.BackgroundTransparency = 1; btnClose.TextColor3 = Color3.new(1,1,1)
+btnClose.Font = "SourceSansBold"; btnClose.TextSize = 20; btnClose.ZIndex = 4
+
+-- RODAPÉ
+local footer = Instance.new("TextLabel", main)
+footer.Size = UDim2.new(1, 0, 0, 24); footer.Position = UDim2.new(0, 0, 1, -26)
+footer.BackgroundTransparency = 1; footer.Text = "Mz URIEL - Sempre Atualizado ✔"
+footer.Font = "SourceSansBold"; footer.TextSize = 13; footer.TextColor3 = NEON; footer.ZIndex = 3
+
+-- ==================== ABAS (LADO DIREITO) ====================
+local sidebar = Instance.new("Frame", main)
+sidebar.Size = UDim2.new(0, 74, 0, 190); sidebar.Position = UDim2.new(1, -84, 0, 72)
+sidebar.BackgroundTransparency = 1; sidebar.ZIndex = 3
+local sideLayout = Instance.new("UIListLayout", sidebar)
+sideLayout.Padding = UDim.new(0, 6); sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
+sideLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local function addTabBtn(label, icon, order)
+    local b = Instance.new("TextButton", sidebar)
+    b.Size = UDim2.new(1, 0, 0, 42)
+    b.BackgroundColor3 = Color3.fromRGB(12, 16, 12)
+    b.Text = ""
+    b.AutoButtonColor = false
+    b.LayoutOrder = order
+    b.ZIndex = 4
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+    local bs = Instance.new("UIStroke", b); bs.Thickness = 1.5; bs.Color = Color3.fromRGB(35, 45, 35)
+    local ic = Instance.new("TextLabel", b)
+    ic.Size = UDim2.new(1, 0, 0, 20); ic.Position = UDim2.new(0, 0, 0, 4)
+    ic.BackgroundTransparency = 1; ic.Text = icon; ic.TextSize = 15; ic.TextColor3 = Color3.new(1,1,1)
+    ic.Font = "SourceSansBold"; ic.ZIndex = 5
+    local lb = Instance.new("TextLabel", b)
+    lb.Size = UDim2.new(1, 0, 0, 14); lb.Position = UDim2.new(0, 0, 0, 24)
+    lb.BackgroundTransparency = 1; lb.Text = label; lb.TextSize = 11; lb.TextColor3 = Color3.fromRGB(200,200,200)
+    lb.Font = "SourceSansBold"; lb.ZIndex = 5
+    return b, bs, ic, lb
+end
+
+-- CONTEÚDO
+local function addContent()
+    local c = Instance.new("ScrollingFrame", main)
+    c.Size = UDim2.new(0, 300, 0, 190); c.Position = UDim2.new(0, 8, 0, 72)
+    c.BackgroundTransparency = 1; c.BorderSizePixel = 0
+    c.ScrollBarThickness = 4; c.ScrollBarImageColor3 = NEON_DIM
+    c.CanvasSize = UDim2.new(0, 0, 0, 0); c.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    c.Visible = false; c.ZIndex = 2
+    local pad = Instance.new("UIPadding", c)
+    pad.PaddingRight = UDim.new(0, 6); pad.PaddingBottom = UDim.new(0, 8)
+    local lay = Instance.new("UIListLayout", c)
+    lay.Padding = UDim.new(0, 5); lay.SortOrder = Enum.SortOrder.LayoutOrder
+    return c, lay
+end
+
+local cFun, funLayout = addContent()
+local cVis, visLayout = addContent()
+local cAju, ajuLayout = addContent()
+local cCre, creLayout = addContent()
+
+local orderFun, orderVis, orderAju, orderCre = 1, 1, 1, 1
+
+local function addSection(text, p)
+    local h = Instance.new("Frame", p)
+    h.Size = UDim2.new(1, 0, 0, 26); h.BackgroundTransparency = 1
+    h.LayoutOrder = (p == cFun and orderFun) or (p == cVis and orderVis) or (p == cAju and orderAju) or orderCre
+    if p == cFun then orderFun = orderFun + 1 elseif p == cVis then orderVis = orderVis + 1
+    elseif p == cAju then orderAju = orderAju + 1 else orderCre = orderCre + 1 end
+    local ic = Instance.new("TextLabel", h)
+    ic.Size = UDim2.new(0, 20, 1, 0); ic.BackgroundTransparency = 1; ic.Text = "⚙"
+    ic.TextColor3 = NEON; ic.TextSize = 15; ic.Font = "SourceSansBold"; ic.TextXAlignment = "Left"
+    local l = Instance.new("TextLabel", h)
+    l.Size = UDim2.new(1, -24, 1, 0); l.Position = UDim2.new(0, 22, 0, 0)
+    l.BackgroundTransparency = 1; l.Text = text; l.TextColor3 = NEON
+    l.Font = "SourceSansBold"; l.TextSize = 16; l.TextXAlignment = "Left"
+    return h
+end
+
+-- Troca de abas
+local tabRefs = {}
+local function resetTabs()
+    for _, r in pairs(tabRefs) do
+        r.btn.BackgroundColor3 = Color3.fromRGB(12, 16, 12)
+        r.stroke.Color = Color3.fromRGB(35, 45, 35)
+        r.icon.TextColor3 = Color3.new(1,1,1)
+        r.label.TextColor3 = Color3.fromRGB(200,200,200)
+    end
+    cFun.Visible = false; cVis.Visible = false; cAju.Visible = false; cCre.Visible = false
+end
+
+local function bindTab(btn, stroke, icon, label, content)
+    table.insert(tabRefs, {btn = btn, stroke = stroke, icon = icon, label = label})
+    btn.Activated:Connect(function()
+        resetTabs()
+        content.Visible = true
+        btn.BackgroundColor3 = Color3.fromRGB(8, 30, 12)
+        stroke.Color = NEON
+        icon.TextColor3 = NEON
+        label.TextColor3 = NEON
+    end)
+end
+
+local bT1, sT1, iT1, lT1 = addTabBtn("Funções", "⚙", 1)
+local bT2, sT2, iT2, lT2 = addTabBtn("Visual", "🎩", 2)
+local bT3, sT3, iT3, lT3 = addTabBtn("Ajustes", "✦", 3)
+local bT4, sT4, iT4, lT4 = addTabBtn("Extras", "★", 4)
+
+bindTab(bT1, sT1, iT1, lT1, cFun)
+bindTab(bT2, sT2, iT2, lT2, cVis)
+bindTab(bT3, sT3, iT3, lT3, cAju)
+bindTab(bT4, sT4, iT4, lT4, cCre)
+
+-- ==================== COMPONENTES ====================
+local function addToggle(name, id, p)
+    local row = Instance.new("TextButton", p)
+    row.Size = UDim2.new(1, 0, 0, 36)
+    row.BackgroundColor3 = ROW_BG
+    row.Text = ""
+    row.AutoButtonColor = false
+    row.BorderSizePixel = 0
+    row.ZIndex = 3
+    row.LayoutOrder = (p == cFun and orderFun) or (p == cVis and orderVis) or (p == cAju and orderAju) or orderCre
+    if p == cFun then orderFun = orderFun + 1 elseif p == cVis then orderVis = orderVis + 1
+    elseif p == cAju then orderAju = orderAju + 1 else orderCre = orderCre + 1 end
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+
+    local lbl = Instance.new("TextLabel", row)
+    lbl.Size = UDim2.new(1, -70, 1, 0); lbl.Position = UDim2.new(0, 12, 0, 0)
+    lbl.BackgroundTransparency = 1; lbl.Text = name; lbl.TextColor3 = Color3.new(1,1,1)
+    lbl.Font = "SourceSansBold"; lbl.TextSize = 14; lbl.TextXAlignment = "Left"
+    lbl.TextTruncate = Enum.TextTruncate.AtEnd
+    lbl.ZIndex = 4
+
+    local track = Instance.new("Frame", row)
+    track.Size = UDim2.new(0, 42, 0, 22); track.Position = UDim2.new(1, -54, 0.5, -11)
+    track.BackgroundColor3 = Color3.fromRGB(38, 42, 38); track.BorderSizePixel = 0
+    track.ZIndex = 4
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+    local knob = Instance.new("Frame", track)
+    knob.Size = UDim2.new(0, 16, 0, 16); knob.Position = UDim2.new(0, 3, 0.5, -8)
+    knob.BackgroundColor3 = Color3.new(1,1,1); knob.BorderSizePixel = 0
+    knob.ZIndex = 5
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+    local function paint(act)
+        track.BackgroundColor3 = act and NEON or Color3.fromRGB(38, 42, 38)
+        knob.Position = act and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+        lbl.TextColor3 = act and NEON or Color3.new(1,1,1)
+    end
+
+    local last = nil
+    row.Activated:Connect(function()
+        if id == "AimbotForte" then cfg.AimbotMode = (cfg.AimbotMode == "Forte") and "None" or "Forte"
+        elseif id == "AimbotFraco" then cfg.AimbotMode = (cfg.AimbotMode == "Fraco") and "None" or "Fraco"
+        elseif id == "Spin" then 
+            cfg.Spin = not cfg.Spin
+            if cfg.Spin then startSpin() else stopSpin() end
+        elseif id == "AntiKick" then
+            cfg.AntiKick = not cfg.AntiKick
+            if cfg.AntiKick then pcall(setupAntiKick) end
+        else cfg[id] = not cfg[id] end
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        local act = (id == "AimbotForte" and cfg.AimbotMode == "Forte") or (id == "AimbotFraco" and cfg.AimbotMode == "Fraco") or (cfg[id] == true)
+        if act ~= last then
+            last = act
+            paint(act)
+        end
+    end)
+end
+
+local function addTargetBtn(name, part, p)
+    local b = Instance.new("TextButton", p)
+    b.Size = UDim2.new(1, 0, 0, 32)
+    b.BackgroundColor3 = ROW_BG
+    b.Text = name
+    b.AutoButtonColor = false
+    b.BorderSizePixel = 0
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Font = "SourceSansBold"; b.TextSize = 13; b.ZIndex = 3
+    b.LayoutOrder = orderFun
+    if p == cFun then orderFun = orderFun + 1 end
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    b.Activated:Connect(function() cfg.TargetPart = part end)
+    RunService.RenderStepped:Connect(function()
+        local sel = (cfg.TargetPart == part)
+        b.TextColor3 = sel and NEON or Color3.new(1,1,1)
+        b.BackgroundColor3 = sel and Color3.fromRGB(8, 28, 12) or ROW_BG
+    end)
+end
+
+local function addStepper(name, key, min, max, p, step, isDecimal)
+    local f = Instance.new("Frame", p)
+    f.Size = UDim2.new(1, 0, 0, 52); f.BackgroundColor3 = ROW_BG; f.BorderSizePixel = 0; f.ZIndex = 3
+    f.LayoutOrder = (p == cVis and orderVis) or (p == cAju and orderAju) or orderCre
+    if p == cVis then orderVis = orderVis + 1 elseif p == cAju then orderAju = orderAju + 1 else orderCre = orderCre + 1 end
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
+
+    local l = Instance.new("TextLabel", f)
+    l.Size = UDim2.new(1, -130, 0, 16); l.Position = UDim2.new(0, 12, 0, 7)
+    l.BackgroundTransparency = 1; l.Text = name; l.TextColor3 = Color3.fromRGB(200,200,200)
+    l.Font = "SourceSansBold"; l.TextSize = 12; l.TextXAlignment = "Left"; l.ZIndex = 4
+
+    local v = Instance.new("TextLabel", f)
+    v.Size = UDim2.new(1, -130, 0, 24); v.Position = UDim2.new(0, 12, 0, 22)
+    v.BackgroundTransparency = 1
+    v.Text = isDecimal and string.format("%.2f", cfg[key]) or tostring(cfg[key])
+    v.TextColor3 = NEON; v.Font = "SourceSansBold"; v.TextSize = 17; v.TextXAlignment = "Left"; v.ZIndex = 4
+
+    local m = Instance.new("TextButton", f)
+    m.Size = UDim2.new(0, 34, 0, 32); m.Position = UDim2.new(1, -82, 0.5, -16)
+    m.Text = "-"; m.BackgroundColor3 = Color3.fromRGB(26, 32, 26); m.TextColor3 = Color3.new(1,1,1)
+    m.Font = "SourceSansBold"; m.TextSize = 18; m.AutoButtonColor = false; m.ZIndex = 4
+    Instance.new("UICorner", m).CornerRadius = UDim.new(0, 7)
+
+    local pl = Instance.new("TextButton", f)
+    pl.Size = UDim2.new(0, 34, 0, 32); pl.Position = UDim2.new(1, -44, 0.5, -16)
+    pl.Text = "+"; pl.BackgroundColor3 = Color3.fromRGB(26, 32, 26); pl.TextColor3 = NEON
+    pl.Font = "SourceSansBold"; pl.TextSize = 18; pl.AutoButtonColor = false; pl.ZIndex = 4
+    Instance.new("UICorner", pl).CornerRadius = UDim.new(0, 7)
+
+    local debounce = false
+    local function updateValue(delta)
+        if debounce then return end
+        debounce = true
+        local newVal = math.clamp(cfg[key] + delta, min, max)
+        if cfg[key] ~= newVal then
+            cfg[key] = newVal
+            v.Text = isDecimal and string.format("%.2f", cfg[key]) or tostring(math.floor(cfg[key]))
+        end
+        task.wait(0.1)
+        debounce = false
+    end
+
+    m.Activated:Connect(function() updateValue(-(step or 5)) end)
+    pl.Activated:Connect(function() updateValue(step or 5) end)
+end
+
+local function addCreditText(text, p)
+    local l = Instance.new("TextLabel", p)
+    l.Size = UDim2.new(1, 0, 0, 28); l.BackgroundTransparency = 1
+    l.Text = text; l.TextColor3 = Color3.new(1,1,1); l.Font = "SourceSansBold"; l.TextSize = 14
+    l.LayoutOrder = orderCre; orderCre = orderCre + 1
+end
+
+-- ==========================================================
+-- ======================= PROTEÇÃO =========================
+-- ==========================================================
+
+local kickStatus, kickMsg
+
+local function logKick(msg)
+    cfg._kickCount = cfg._kickCount + 1
+    if kickMsg then
+        kickMsg.Text = "Último kick: " .. tostring(msg)
+        kickMsg.TextColor3 = Color3.fromRGB(255, 120, 120)
+    end
+end
+
+-- REJOIN REFORÇADO (mesmo servidor, com repetição)
+local function queueRejoin()
+    if cfg._rejoining or not cfg.AutoReconnect then return end
+    cfg._rejoining = true
+    local job = game.JobId
+    local place = game.PlaceId
+
+    task.delay(1.2, function()
+        pcall(function() TeleportService:TeleportToPlaceInstance(place, job, LocalPlayer) end)
+    end)
+
+    task.delay(4.5, function()
+        if game.JobId == job then
+            pcall(function() TeleportService:TeleportToPlaceInstance(place, job, LocalPlayer) end)
+        end
+    end)
+
+    task.delay(8.5, function()
+        if game.JobId == job then
+            pcall(function() TeleportService:Teleport(place, LocalPlayer) end)
+        end
+    end)
+
+    task.delay(13, function() cfg._rejoining = false end)
+end
+
+-- HOOK ANTI KICK (não deixa o cliente travado)
+function setupAntiKick()
+    if cfg._antiKickHooked then return true end
+
+    local ok = pcall(function()
+        local mt = getrawmetatable(game)
+        if not mt then error("sem metatable") end
+        local oldNamecall = mt.__namecall
+        setreadonly(mt, false)
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if method == "Kick" and self == LocalPlayer and cfg.AntiKick then
+                local args = { ... }
+                pcall(logKick, tostring(args[1] or "sem mensagem"))
+                queueRejoin()
+                return
+            end
+            return oldNamecall(self, ...)
+        end)
+        setreadonly(mt, true)
+    end)
+
+    if not ok then
+        ok = pcall(function()
+            local oldKick = hookfunction(LocalPlayer.Kick, function(self, msg)
+                if cfg.AntiKick then
+                    pcall(logKick, tostring(msg or "sem mensagem"))
+                    queueRejoin()
+                    return
+                end
+                return oldKick(self, msg)
+            end)
+        end)
+    end
+
+    cfg._antiKickHooked = ok
+    if kickStatus then
+        kickStatus.Text = ok and "Hook: ATIVO" or "Hook: indisponível (só rejoin)"
+        kickStatus.TextColor3 = ok and NEON or Color3.fromRGB(255, 160, 60)
+    end
+    return ok
+end
+
+-- VIGIA DE DESCONEXÃO
+task.spawn(function()
+    while mainGui.Parent do
+        task.wait(1.5)
+        if cfg.AutoReconnect and not cfg._rejoining and game:IsLoaded() then
+            pcall(function()
+                if not LocalPlayer or not LocalPlayer.Parent then
+                    queueRejoin()
+                end
+            end)
+        end
+    end
+end)
+
+-- GATILHO POR TROCA DE SERVIDOR
+pcall(function()
+    LocalPlayer.OnTeleport:Connect(function(state)
+        if state == Enum.TeleportState.Started then
+            cfg._rejoining = true
+            task.delay(12, function() cfg._rejoining = false end)
+        end
+    end)
+end)
+
+-- ANTI AFK
+pcall(function()
+    LocalPlayer.Idled:Connect(function()
+        if cfg.AntiAFK then
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        end
+    end)
+end)
+
+-- ANTI AFK reserva (loop)
+task.spawn(function()
+    while mainGui.Parent do
+        task.wait(25)
+        if cfg.AntiAFK then
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        end
+    end
+end)
+
+-- ANTI SCREENSHOT (esconde a UI quando o Roblox tira print)
+task.spawn(function()
+    local sg = LocalPlayer:WaitForChild("PlayerGui")
+    local hud = sg:WaitForChild("ScreenshotHud", 15)
+    if not hud then return end
+    cfg._screenshotHud = hud
+    local function check()
+        if not cfg.AntiScreenshot then return end
+        local ativo = false
+        pcall(function()
+            ativo = hud.Enabled and hud.Visible
+        end)
+        if ativo then
+            main.Visible = false
+            bubble.Visible = false
+        else
+            if not cfg.Stealth then bubble.Visible = true end
+        end
+    end
+    pcall(function() hud:GetPropertyChangedSignal("Enabled"):Connect(check) end)
+    pcall(function() hud:GetPropertyChangedSignal("Visible"):Connect(check) end)
+end)
+
+-- ==========================================================
+-- ===================== FIM PROTEÇÃO =======================
+-- ==========================================================
+
+-- ========== CONSTRUÇÃO DO MENU ==========
+-- ABA FUNÇÕES
+addSection("FUNÇÕES", cFun)
+addToggle("ESP + LINHAS", "ESP", cFun)
+addToggle("AIMBOT FORTE", "AimbotForte", cFun)
+addToggle("AIMBOT FRACO", "AimbotFraco", cFun)
+addToggle("MOSTRAR FOV", "FOV", cFun)
+addToggle("IGNORAR TIME", "SafeTeam", cFun)
+addToggle("LED RGB", "LEDActive", cFun)
+addToggle("GIRAR", "Spin", cFun)
+
+local infoFrame = Instance.new("Frame", cFun)
+infoFrame.LayoutOrder = orderFun; orderFun = orderFun + 1
+infoFrame.Size = UDim2.new(1, 0, 0, 26); infoFrame.BackgroundColor3 = Color3.fromRGB(26, 32, 26)
+Instance.new("UICorner", infoFrame).CornerRadius = UDim.new(0, 8)
+local infoText = Instance.new("TextLabel", infoFrame)
+infoText.Size = UDim2.new(1, 0, 1, 0); infoText.Text = "(foco de mira)"; infoText.TextColor3 = Color3.fromRGB(160,170,160); infoText.BackgroundTransparency = 1; infoText.Font = "SourceSansItalic"; infoText.TextSize = 13
+
+addTargetBtn("CABEÇA", "Head", cFun)
+addTargetBtn("PEITO", "Torso", cFun)
+addTargetBtn("BRAÇO DIREITO", "RightArm", cFun)
+addTargetBtn("BRAÇO ESQUERDO", "LeftArm", cFun)
+addTargetBtn("PERNAS", "Legs", cFun)
+
+-- DIAGNÓSTICO
+local dbgFrame = Instance.new("Frame", cFun)
+dbgFrame.LayoutOrder = orderFun; orderFun = orderFun + 1
+dbgFrame.Size = UDim2.new(1, 0, 0, 34); dbgFrame.BackgroundColor3 = Color3.fromRGB(10, 14, 10)
+Instance.new("UICorner", dbgFrame).CornerRadius = UDim.new(0, 8)
+local dbg = Instance.new("TextLabel", dbgFrame)
+dbg.Size = UDim2.new(1, -10, 1, 0); dbg.Position = UDim2.new(0, 5, 0, 0)
+dbg.BackgroundTransparency = 1; dbg.Text = "diag: iniciando"; dbg.TextColor3 = Color3.fromRGB(0, 200, 90)
+dbg.Font = "Code"; dbg.TextSize = 11; dbg.TextXAlignment = "Left"
+dbg.TextWrapped = true
+
+-- ABA VISUAL
+addSection("VISUAL", cVis)
+addStepper("TAMANHO FOV", "FOVSize", 10, 800, cVis, 10)
+addStepper("ALINHADOR FOV", "FOVPos", -300, 300, cVis, 5)
+addStepper("TRANSPARÊNCIA", "Transparency", 0, 0.9, cVis, 0.05, true)
+addStepper("VELO LED", "LEDSpeed", 1, 50, cVis, 1)
+addStepper("COR R", "R", 0, 255, cVis, 5)
+addStepper("COR G", "G", 0, 255, cVis, 5)
+addStepper("COR B", "B", 0, 255, cVis, 5)
+
+-- ABA AJUSTES
+addSection("PROTEÇÃO", cAju)
+addToggle("ANTI KICK", "AntiKick", cAju)
+addToggle("ANTI AFK", "AntiAFK", cAju)
+addToggle("ANTI SCREENSHOT", "AntiScreenshot", cAju)
+addToggle("AUTO REJOIN", "AutoReconnect", cAju)
+
+kickStatus = Instance.new("TextLabel", cAju)
+kickStatus.LayoutOrder = orderAju; orderAju = orderAju + 1
+kickStatus.Size = UDim2.new(1, 0, 0, 18); kickStatus.BackgroundTransparency = 1
+kickStatus.Text = "Hook: aguardando"; kickStatus.TextColor3 = Color3.fromRGB(160,170,160)
+kickStatus.TextSize = 12; kickStatus.Font = "SourceSansItalic"; kickStatus.TextXAlignment = "Left"
+
+kickMsg = Instance.new("TextLabel", cAju)
+kickMsg.LayoutOrder = orderAju; orderAju = orderAju + 1
+kickMsg.Size = UDim2.new(1, 0, 0, 18); kickMsg.BackgroundTransparency = 1
+kickMsg.Text = "Último kick: nenhum"; kickMsg.TextColor3 = Color3.fromRGB(160,170,160)
+kickMsg.TextSize = 12; kickMsg.Font = "SourceSansItalic"; kickMsg.TextXAlignment = "Left"
+kickMsg.TextTruncate = Enum.TextTruncate.AtEnd
+
+local btnRejoin = Instance.new("TextButton", cAju)
+btnRejoin.LayoutOrder = orderAju; orderAju = orderAju + 1
+btnRejoin.Size = UDim2.new(1, 0, 0, 38); btnRejoin.BackgroundColor3 = Color3.fromRGB(0, 110, 60)
+btnRejoin.TextColor3 = Color3.new(1,1,1); btnRejoin.Font = "SourceSansBold"; btnRejoin.TextSize = 14
+btnRejoin.Text = "RECONECTAR AGORA"; btnRejoin.AutoButtonColor = false
+Instance.new("UICorner", btnRejoin).CornerRadius = UDim.new(0, 8)
+btnRejoin.Activated:Connect(function()
+    cfg._rejoining = false
+    queueRejoin()
+end)
+
+-- ABA EXTRAS
+addSection("CRÉDITOS", cCre)
+addCreditText("Executor: Delta", cCre)
+addCreditText("Versão do Hub: 6.3", cCre)
+addCreditText("Criadores: Mz Studio", cCre)
+addCreditText("Créditos: Mz mod", cCre)
+
+local btnDiscord = Instance.new("TextButton", cCre)
+btnDiscord.LayoutOrder = orderCre; orderCre = orderCre + 1
+btnDiscord.Size = UDim2.new(1, 0, 0, 42)
+btnDiscord.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+btnDiscord.TextColor3 = Color3.new(1,1,1)
+btnDiscord.Font = "SourceSansBold"; btnDiscord.TextSize = 14
+btnDiscord.Text = "COPIAR LINK DO DISCORD"; btnDiscord.AutoButtonColor = false
+Instance.new("UICorner", btnDiscord).CornerRadius = UDim.new(0, 8)
+btnDiscord.Activated:Connect(function()
+    if setclipboard then
+        setclipboard("https://discord.gg/q8gpA7CnF")
+        btnDiscord.Text = "LINK COPIADO!"
+        task.delay(2, function() btnDiscord.Text = "COPIAR LINK DO DISCORD" end)
+    else
+        btnDiscord.Text = "ERRO: SEM SUPORTE"
+        task.delay(2, function() btnDiscord.Text = "COPIAR LINK DO DISCORD" end)
+    end
+end)
+
+-- abre já na primeira aba
+resetTabs()
+cFun.Visible = true
+bT1.BackgroundColor3 = Color3.fromRGB(8, 30, 12)
+sT1.Color = NEON; iT1.TextColor3 = NEON; lT1.TextColor3 = NEON
+
+-- ativa o hook logo de cara
+pcall(setupAntiKick)
+
+-- ========== BOLINHA ==========
+bubble.Activated:Connect(function()
+    if main.Visible then
+        main.Visible = false
+    else
+        main.Position = UDim2.new(0.5, -200, 0.5, -145)
+        main.Visible = true
+    end
+end)
+
+-- ========== MINIMIZAR ==========
+btnMin.Activated:Connect(function()
+    if main.Size.Y.Offset >= 200 then
+        main.Size = UDim2.new(0, 400, 0, 46)
+    else
+        main.Size = UDim2.new(0, 400, 0, 290)
+    end
+end)
+
+-- ========== LOOP PRINCIPAL (roda DEPOIS do script de câmera do jogo) ==========
+local RENDER_NAME = "MzUrielRender"
+pcall(function() RunService:UnbindFromRenderStep(RENDER_NAME) end)
+
+RunService:BindToRenderStep(RENDER_NAME, Enum.RenderPriority.Camera.Value + 1, function()
+    local cam = getCam()
+    if not cam then return end
+
+    -- VISUAL DO PAINEL
+    local okVis = pcall(function()
+        fovFrame.Visible = cfg.FOV
+        fovFrame.Size = UDim2.new(0, cfg.FOVSize*2, 0, cfg.FOVSize*2)
+        fovFrame.Position = UDim2.new(0.5, -cfg.FOVSize, 0.5, -cfg.FOVSize + cfg.FOVPos)
+
+        local bgColor = getRealColor()
+        local darkBg = Color3.new(bgColor.R * 0.15, bgColor.G * 0.15, bgColor.B * 0.15)
+        main.BackgroundColor3 = darkBg
+        confirmFrame.BackgroundColor3 = darkBg
+        main.BackgroundTransparency = cfg.Transparency
+        confirmFrame.BackgroundTransparency = cfg.Transparency
+
+        local borderColor
+        if cfg.LEDActive then
+            local hue = (tick() * (cfg.LEDSpeed / 10)) % 1
+            borderColor = Color3.fromHSV(hue, 1, 1)
+        else
+            borderColor = bgColor
+        end
+
+        fovStroke.Color = borderColor
+        mStroke.Color = borderColor
+        bStroke.Color = borderColor
+        cStroke.Color = borderColor
+        title.TextColor3 = borderColor
+    end)
+
+    -- ESP
+    local espErr = nil
+    local okEsp, errEsp = pcall(function()
+        if cfg.ESP then
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    updateESP(player, getRealColor(), cam)
+                end
+            end
+        else
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    clearESP(player)
+                end
+            end
+        end
+    end)
+    if not okEsp then espErr = tostring(errEsp) end
+
+    -- AIMBOT
+    local target = nil
+    local dist = cfg.FOVSize
+    local center = Vector2.new(cam.ViewportSize.X/2, (cam.ViewportSize.Y/2) + cfg.FOVPos)
+
+    local okAim, errAim = pcall(function()
+        if cfg.AimbotMode ~= "None" then
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    local char = player.Character
+                    local isTeammate = (player.Team == LocalPlayer.Team)
+                    if char and not (cfg.SafeTeam and isTeammate) then
+                        local humanoid = char:FindFirstChild("Humanoid")
+                        if humanoid and humanoid.Health > 0 then
+                            local part = getPrecisePart(char, cfg.TargetPart)
+                            if part then
+                                local pos, vis = cam:WorldToViewportPoint(part.Position)
+                                if vis then
+                                    local mDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                                    if mDist <= cfg.FOVSize and mDist < dist then
+                                        dist = mDist
+                                        target = part
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
+    if target then
+        cam.CFrame = cam.CFrame:Lerp(CFrame.new(cam.CFrame.Position, target.Position), (cfg.AimbotMode == "Forte" and 1 or 0.15))
+    end
+
+    -- DIAGNÓSTICO
+    pcall(function()
+        dbg.Text = string.format("cam:%s alvo:%s | erro:%s",
+            cam and "ok" or "nil",
+            target and "SIM" or "nao",
+            espErr and "ESP" or (okAim and "-" or "AIM"))
+    end)
+end)
+
+-- Stealth aplicado no loop de estado
+RunService.RenderStepped:Connect(function()
+    pcall(function()
+        if cfg.Stealth then
+            if bubble.Visible then bubble.Visible = false end
+            if main.Visible then main.Visible = false end
+        elseif not cfg.AntiScreenshot then
+            if not bubble.Visible then bubble.Visible = true end
+        end
+    end)
+end)
+
+btnClose.Activated:Connect(function() confirmFrame.Visible = true end)
+bNao.Activated:Connect(function() confirmFrame.Visible = false end)
+bSim.Activated:Connect(function() 
+    pcall(function() RunService:UnbindFromRenderStep(RENDER_NAME) end)
+    for _, line in pairs(tracers) do 
+        pcall(function() line:Remove() end)
+    end
+    for _, hl in pairs(highlights) do
+        pcall(function() hl:Destroy() end)
+    end
+    stopSpin()
+    mainGui:Destroy() 
+end)
+
+stopSpin()
