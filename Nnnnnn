@@ -1,0 +1,1889 @@
+-- ==================== SCRIPT PRINCIPAL (Mz URIEL) ====================
+if getgenv().MZ_UNLOAD then pcall(getgenv().MZ_UNLOAD) end
+local minhaTag = {}
+getgenv().MZ_TAG = minhaTag
+local function vivo() return getgenv().MZ_TAG == minhaTag end
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Stats = game:GetService("Stats")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local BASE_R = 150
+local BASE_G = 60
+local BASE_B = 255
+
+local cfg = {
+    ESP = false, AimbotMode = "None", FOV = false,
+    FOVSize = 100, FOVPos = 0, SafeTeam = false,
+    LEDActive = false, LEDSpeed = 1,
+    TargetPart = "Head",
+    Transp = false,
+    R = 0, G = 0, B = 0,
+    Spin = false,
+    AimVisible = true, AimNear = false, AimDist = 250,
+    NpcESP = false, NpcAimbotMode = "None", NpcFOV = false,
+    NpcTarget = "Head", NpcDist = 500,
+    CarESP = false, CarDist = 1000,
+    SpeedOn = false, Speed = 50,
+    ModoAFK = false,
+    UmTiro = false, Imortal = false,
+    VeiculoTurbo = false, VeiculoVel = 90,
+    TpDist = 9,
+    AntiKick = true, AntiAFK = true, AutoReconnect = true, AntiScreenshot = true, AntiDetector = true,
+    AutoTrocarServidor = true,
+    HookPesado = false,
+    Stealth = false, God = false, MaxProt = true,
+    _antiKickHooked = false, _rejoining = false, _screenshotHud = nil
+}
+
+local spinConnection = nil
+local function startSpin()
+    if spinConnection then spinConnection:Disconnect() end
+    spinConnection = RunService.RenderStepped:Connect(function()
+        if not vivo() then return end
+        if cfg.Spin and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = LocalPlayer.Character.HumanoidRootPart
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(15), 0)
+        end
+    end)
+end
+local function stopSpin()
+    if spinConnection then spinConnection:Disconnect() end
+    spinConnection = nil
+end
+
+local function getRealColor()
+    local r = math.max(0, BASE_R - cfg.R)
+    local g = math.max(0, BASE_G - cfg.G)
+    local b = math.max(0, BASE_B - cfg.B)
+    return Color3.fromRGB(r, g, b)
+end
+
+local rayParams = RaycastParams.new()
+rayParams.IgnoreWater = true
+pcall(function() rayParams.FilterType = Enum.RaycastFilterType.Exclude end)
+pcall(function()
+    if rayParams.FilterType ~= Enum.RaycastFilterType.Exclude then
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    end
+end)
+
+local function temVisao(part)
+    local ok, res = pcall(function()
+        local char = LocalPlayer.Character
+        local filtro = {}
+        if char then table.insert(filtro, char) end
+        if part.Parent then table.insert(filtro, part.Parent) end
+        rayParams.FilterDescendantsInstances = filtro
+        local origem = Camera.CFrame.Position
+        local hit = workspace:Raycast(origem, part.Position - origem, rayParams)
+        if not hit then return true end
+        if hit.Instance == part then return true end
+        if hit.Instance.Parent and hit.Instance:IsDescendantOf(part.Parent) then return true end
+        return false
+    end)
+    if not ok then return true end
+    return res
+end
+
+local function getPrecisePart(char, partName)
+    if partName == "Head" then return char:FindFirstChild("Head")
+    elseif partName == "Torso" then return char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+    elseif partName == "RightArm" then return char:FindFirstChild("RightUpperArm") or char:FindFirstChild("Right Arm")
+    elseif partName == "LeftArm" then return char:FindFirstChild("LeftUpperArm") or char:FindFirstChild("Left Arm")
+    elseif partName == "Legs" then return char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("Right Leg") end
+    return nil
+end
+
+local function createTracer()
+    local line = Drawing.new("Line")
+    line.Thickness = 1.5
+    line.Transparency = 1
+    line.Visible = false
+    return line
+end
+
+local tracers = {}
+local highlights = {}
+
+local COL_VIS   = Color3.fromRGB(0, 255, 90)
+local COL_HIDDEN = Color3.fromRGB(0, 0, 0)
+local COL_OUTLINE_HIDDEN = Color3.fromRGB(45, 45, 45)
+
+local function clearESP(player)
+    local line = tracers[player]
+    if line then line.Visible = false end
+    local hl = highlights[player]
+    if hl then
+        pcall(function() hl:Destroy() end)
+        highlights[player] = nil
+    end
+end
+
+local function updateESP(player, color)
+    local char = player.Character
+    local isTeammate = (player.Team == LocalPlayer.Team)
+    local line = tracers[player]
+    if not line then
+        line = createTracer()
+        tracers[player] = line
+    end
+
+    if not cfg.ESP then
+        line.Visible = false
+        return
+    end
+
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local humanoid = char:FindFirstChild("Humanoid")
+        local isAlive = humanoid and humanoid.Health > 0
+        if not isAlive then
+            clearESP(player)
+            return
+        end
+
+        local root = char.HumanoidRootPart
+        local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+        local inFront = Camera.CFrame:PointToObjectSpace(root.Position).Z < 0
+        local visivel = onScreen and inFront
+
+        local hl = highlights[player]
+
+        if not (cfg.SafeTeam and isTeammate) then
+            if not hl then
+                hl = Instance.new("Highlight")
+                hl.Name = "MzHighlight"
+                hl.Parent = char
+                highlights[player] = hl
+            end
+            hl.FillColor = visivel and COL_VIS or COL_HIDDEN
+            hl.OutlineColor = visivel and Color3.new(1,1,1) or COL_OUTLINE_HIDDEN
+            hl.Enabled = true
+
+            if inFront then
+                line.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                line.To = Vector2.new(pos.X, pos.Y)
+                line.Color = visivel and COL_VIS or COL_HIDDEN
+                line.Visible = true
+            else
+                line.Visible = false
+            end
+        else
+            if hl then
+                hl:Destroy()
+                highlights[player] = nil
+            end
+            line.Visible = false
+        end
+    else
+        clearESP(player)
+    end
+end
+
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        player.CharacterRemoving:Connect(function() clearESP(player) end)
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        player.CharacterRemoving:Connect(function() clearESP(player) end)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    clearESP(player)
+    if tracers[player] then
+        tracers[player]:Remove()
+        tracers[player] = nil
+    end
+end)
+
+local function makeDraggable(topbar, object)
+    local dragging, dragInput, dragStart, startPos
+    topbar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = object.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    topbar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    RunService.RenderStepped:Connect(function()
+        if not vivo() then return end
+        if dragging and dragInput then
+            local delta = dragInput.Position - dragStart
+            object.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- ================= PALETA =================
+local COL_BG          = Color3.fromRGB(14, 9, 22)
+local COL_ROW         = Color3.fromRGB(24, 18, 34)
+local COL_ROW_STROKE  = Color3.fromRGB(56, 40, 82)
+local COL_ON          = Color3.fromRGB(160, 80, 255)
+local COL_OFF         = Color3.fromRGB(58, 50, 70)
+local COL_TXT         = Color3.new(1, 1, 1)
+local COL_DIM         = Color3.fromRGB(160, 150, 180)
+local COL_GREEN       = Color3.fromRGB(165, 90, 255)
+local COL_ACTIVE      = Color3.fromRGB(88, 36, 150)
+
+local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
+
+local mainGui = Instance.new("ScreenGui")
+mainGui.Name = "MzUrielHub"
+mainGui.ResetOnSpawn = false
+mainGui.DisplayOrder = 999
+mainGui.Parent = playerGui
+
+local fovFrame = Instance.new("Frame", mainGui)
+fovFrame.BackgroundTransparency = 1; fovFrame.Visible = false
+local fovStroke = Instance.new("UIStroke", fovFrame); fovStroke.Thickness = 1.5
+Instance.new("UICorner", fovFrame).CornerRadius = UDim.new(1, 0)
+
+local bubble = Instance.new("ImageButton", mainGui)
+bubble.Size = UDim2.new(0, 60, 0, 60); bubble.Position = UDim2.new(0.5, -30, 0.5, -30)
+bubble.BackgroundColor3 = Color3.fromRGB(20, 12, 30); bubble.Image = "rbxassetid://81545220272311"; bubble.ZIndex = 1000
+Instance.new("UICorner", bubble).CornerRadius = UDim.new(1, 0)
+local bStroke = Instance.new("UIStroke", bubble); bStroke.Thickness = 2; bStroke.Color = COL_GREEN
+makeDraggable(bubble, bubble)
+
+local hud = Instance.new("Frame", mainGui)
+hud.Size = UDim2.new(0, 258, 0, 56)
+hud.Position = UDim2.new(1, -270, 0, 14)
+hud.BackgroundColor3 = Color3.fromRGB(8, 4, 14)
+hud.BackgroundTransparency = 0.08
+hud.BorderSizePixel = 0
+hud.ZIndex = 1200
+Instance.new("UICorner", hud).CornerRadius = UDim.new(0, 8)
+local hudStroke = Instance.new("UIStroke", hud); hudStroke.Color = COL_GREEN; hudStroke.Thickness = 1.5; hudStroke.Transparency = 0.2
+makeDraggable(hud, hud)
+
+local function hudCol(x, label, cor)
+    local cap = Instance.new("TextLabel", hud)
+    cap.Size = UDim2.new(0, 74, 0, 14); cap.Position = UDim2.new(0, x, 0, 6)
+    cap.BackgroundTransparency = 1; cap.Text = label; cap.TextXAlignment = "Left"
+    cap.Font = "SourceSansBold"; cap.TextSize = 10; cap.TextColor3 = COL_DIM; cap.ZIndex = 1201
+    local v = Instance.new("TextLabel", hud)
+    v.Size = UDim2.new(0, 74, 0, 28); v.Position = UDim2.new(0, x, 0, 20)
+    v.BackgroundTransparency = 1; v.Text = "0"; v.TextXAlignment = "Left"
+    v.Font = "SourceSansBold"; v.TextSize = 24; v.TextColor3 = cor; v.ZIndex = 1201
+    return v
+end
+
+local hudFps = hudCol(12, "FPS", Color3.fromRGB(0, 255, 120))
+local hudPing = hudCol(94, "PING", Color3.new(1,1,1))
+local hudKills = hudCol(176, "KILLS", Color3.fromRGB(255, 200, 60))
+
+local main = Instance.new("Frame", mainGui)
+main.Size = UDim2.new(0, 460, 0, 380)
+main.Position = UDim2.new(0.5, -230, 0.5, -190)
+main.BackgroundColor3 = COL_BG
+main.Visible = false
+main.ClipsDescendants = true
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+local mStroke = Instance.new("UIStroke", main); mStroke.Thickness = 2; mStroke.Color = COL_GREEN
+
+local confirmFrame = Instance.new("Frame", mainGui)
+confirmFrame.Size = UDim2.new(0, 250, 0, 130); confirmFrame.Position = UDim2.new(0.5, -125, 0.5, -65)
+confirmFrame.BackgroundColor3 = COL_BG
+confirmFrame.Visible = false
+confirmFrame.ZIndex = 10000
+Instance.new("UICorner", confirmFrame).CornerRadius = UDim.new(0, 8)
+local cStroke = Instance.new("UIStroke", confirmFrame); cStroke.Thickness = 2; cStroke.Color = COL_GREEN
+local cText = Instance.new("TextLabel", confirmFrame)
+cText.Size = UDim2.new(1, 0, 0, 50); cText.Position = UDim2.new(0, 0, 0, 10); cText.Text = "Você deseja fechar o painel?"; cText.TextColor3 = Color3.new(1,1,1); cText.BackgroundTransparency = 1; cText.Font = "SourceSansBold"; cText.TextSize = 17; cText.ZIndex = 10001
+local bSim = Instance.new("TextButton", confirmFrame); bSim.Size = UDim2.new(0, 100, 0, 45); bSim.Position = UDim2.new(0.07, 0, 0.52, 0); bSim.Text = "SIM"; bSim.BackgroundColor3 = Color3.fromRGB(0, 150, 50); bSim.TextColor3 = Color3.new(1,1,1); bSim.Font = "SourceSansBold"; bSim.TextSize = 18; bSim.ZIndex = 10001; Instance.new("UICorner", bSim).CornerRadius = UDim.new(0, 6)
+local bNao = Instance.new("TextButton", confirmFrame); bNao.Size = UDim2.new(0, 100, 0, 45); bNao.Position = UDim2.new(0.53, 0, 0.52, 0); bNao.Text = "NÃO"; bNao.BackgroundColor3 = Color3.fromRGB(140, 20, 20); bNao.TextColor3 = Color3.new(1,1,1); bNao.Font = "SourceSansBold"; bNao.TextSize = 18; bNao.ZIndex = 10001; Instance.new("UICorner", bNao).CornerRadius = UDim.new(0, 6)
+
+local top = Instance.new("Frame", main); top.Size = UDim2.new(1, 0, 0, 46); top.BackgroundTransparency = 1
+top.Active = true
+makeDraggable(top, main)
+local crown = Instance.new("TextLabel", top)
+crown.Size = UDim2.new(0, 32, 0, 32); crown.Position = UDim2.new(0, 12, 0.5, -16)
+crown.BackgroundTransparency = 1; crown.Text = "👑"; crown.TextSize = 24; crown.TextColor3 = COL_GREEN
+local title = Instance.new("TextLabel", top)
+title.Size = UDim2.new(1, -110, 1, 0); title.Position = UDim2.new(0, 48, 0, 0)
+title.BackgroundTransparency = 1; title.Text = "Mz URIEL"; title.Font = "SourceSansBold"
+title.TextSize = 22; title.TextXAlignment = "Left"; title.TextColor3 = COL_GREEN
+local btnMin = Instance.new("TextButton", top); btnMin.Size = UDim2.new(0, 30, 0, 30); btnMin.Position = UDim2.new(1, -70, 0.5, -15); btnMin.Text = "–"; btnMin.BackgroundTransparency = 1; btnMin.TextColor3 = Color3.new(1,1,1); btnMin.TextSize = 22; btnMin.Font = "SourceSansBold"
+local btnClose = Instance.new("TextButton", top); btnClose.Size = UDim2.new(0, 30, 0, 30); btnClose.Position = UDim2.new(1, -36, 0.5, -15); btnClose.Text = "✕"; btnClose.BackgroundTransparency = 1; btnClose.TextColor3 = Color3.new(1,1,1); btnClose.TextSize = 20; btnClose.Font = "SourceSansBold"
+
+local divider = Instance.new("Frame", main)
+divider.Size = UDim2.new(1, -20, 0, 1); divider.Position = UDim2.new(0, 10, 0, 46)
+divider.BackgroundColor3 = COL_GREEN; divider.BackgroundTransparency = 0.6; divider.BorderSizePixel = 0
+
+local footer = Instance.new("TextLabel", main)
+footer.Size = UDim2.new(1, 0, 0, 24); footer.Position = UDim2.new(0, 0, 1, -26)
+footer.BackgroundTransparency = 1; footer.Text = "Mz URIEL - Sempre Atualizado ✓"
+footer.Font = "SourceSansBold"; footer.TextSize = 14; footer.TextColor3 = COL_GREEN
+
+local pageTitle = Instance.new("TextLabel", main)
+pageTitle.Size = UDim2.new(0, 320, 0, 26); pageTitle.Position = UDim2.new(0, 12, 0, 50)
+pageTitle.BackgroundTransparency = 1; pageTitle.TextXAlignment = "Left"
+pageTitle.Font = "SourceSansBold"; pageTitle.TextSize = 16; pageTitle.TextColor3 = COL_GREEN
+
+local sidebar = Instance.new("Frame", main)
+sidebar.Size = UDim2.new(0, 118, 0, 330); sidebar.Position = UDim2.new(0, 10, 0, 42)
+sidebar.BackgroundTransparency = 1
+local sideLayout = Instance.new("UIListLayout", sidebar)
+sideLayout.Padding = UDim.new(0, 4); sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local ABAS = {
+    {"Home", "🏠"},
+    {"PVP", "⚔"},
+    {"Player", "👤"},
+    {"Visual", "🎩"},
+    {"Veiculo", "🚗"},
+    {"Teleports", "📍"},
+    {"Proteção", "🛡"}
+}
+
+local tabBtns = {}
+for i, dados in ipairs(ABAS) do
+    local b = Instance.new("TextButton", sidebar)
+    b.Size = UDim2.new(1, 0, 0, 30); b.BackgroundColor3 = COL_ACTIVE
+    b.BackgroundTransparency = 1
+    b.Text = dados[1]; b.TextXAlignment = "Left"; b.TextColor3 = COL_DIM
+    b.Font = "SourceSansBold"; b.TextSize = 13; b.AutoButtonColor = false
+    b.LayoutOrder = i
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    local pad = Instance.new("UIPadding", b); pad.PaddingLeft = UDim.new(0, 10)
+    tabBtns[i] = b
+end
+
+local orders = {}
+local function nextOrder(p)
+    orders[p] = (orders[p] or 0) + 1
+    return orders[p]
+end
+
+local function newPage()
+    local p = Instance.new("ScrollingFrame", main)
+    p.Size = UDim2.new(0, 316, 0, 322); p.Position = UDim2.new(0, 134, 0, 46)
+    p.BackgroundTransparency = 1; p.BorderSizePixel = 0
+    p.ScrollingDirection = Enum.ScrollingDirection.Y
+    p.ScrollBarThickness = 4; p.ScrollBarImageColor3 = COL_GREEN
+    p.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
+    p.ScrollingEnabled = true; p.Active = true
+    p.ClipsDescendants = true
+    p.AutomaticCanvasSize = Enum.AutomaticSize.None
+    p.CanvasSize = UDim2.new(0, 0, 0, 0)
+    p.Visible = false
+    local pad = Instance.new("UIPadding", p); pad.PaddingBottom = UDim.new(0, 10)
+    local l = Instance.new("UIListLayout", p)
+    l.Padding = UDim.new(0, 6); l.SortOrder = Enum.SortOrder.LayoutOrder
+    local function refresh()
+        p.CanvasSize = UDim2.new(0, 0, 0, l.AbsoluteContentSize.Y + 12)
+    end
+    l:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refresh)
+    p.ChildAdded:Connect(function() task.defer(refresh) end)
+    p.ChildRemoved:Connect(function() task.defer(refresh) end)
+    task.defer(refresh)
+    return p
+end
+
+local cHome = Instance.new("Frame", main)
+cHome.Size = UDim2.new(0, 316, 0, 322); cHome.Position = UDim2.new(0, 134, 0, 46)
+cHome.BackgroundTransparency = 1; cHome.Visible = false
+
+local cPvpTab = newPage()
+local cPlayerTab = newPage()
+local cVis = newPage()
+local cVei = newPage()
+local cTp = newPage()
+local cMisc = newPage()
+
+local paginas = {cHome, cPvpTab, cPlayerTab, cVis, cVei, cTp, cMisc}
+
+local function resetTabs()
+    for _, b in ipairs(tabBtns) do
+        b.BackgroundTransparency = 1
+        b.TextColor3 = COL_DIM
+    end
+    for _, pg in ipairs(paginas) do
+        pg.Visible = false
+    end
+end
+
+local function openTab(i)
+    resetTabs()
+    local pg = paginas[i]
+    if not pg then return end
+    pg.Visible = true
+    tabBtns[i].BackgroundTransparency = 0
+    tabBtns[i].TextColor3 = COL_TXT
+    if pg:IsA("ScrollingFrame") then
+        pg.CanvasPosition = Vector2.new(0, 0)
+        task.defer(function()
+            local l = pg:FindFirstChildOfClass("UIListLayout")
+            if l then pg.CanvasSize = UDim2.new(0, 0, 0, l.AbsoluteContentSize.Y + 12) end
+            pg.CanvasPosition = Vector2.new(0, 0)
+        end)
+    end
+    pageTitle.Text = ABAS[i][2] .. "  " .. ABAS[i][1]
+end
+
+for i, b in ipairs(tabBtns) do
+    b.MouseButton1Click:Connect(function() openTab(i) end)
+end
+openTab(1)
+
+-- ================= CONSTRUÇÃO =================
+local function addToggle(name, id, p, suffix)
+    local b = Instance.new("TextButton", p)
+    b.Size = UDim2.new(1, -8, 0, 34); b.BackgroundColor3 = COL_ROW
+    b.BackgroundTransparency = 0.35
+    b.Text = ""; b.AutoButtonColor = false; b.LayoutOrder = nextOrder(p)
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    local st = Instance.new("UIStroke", b); st.Color = COL_ROW_STROKE; st.Thickness = 1; st.Transparency = 0.3
+
+    local lbl = Instance.new("TextLabel", b)
+    lbl.Size = UDim2.new(1, -62, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0)
+    lbl.BackgroundTransparency = 1; lbl.TextXAlignment = "Left"; lbl.Font = "SourceSansBold"
+    lbl.TextSize = 13; lbl.TextColor3 = COL_TXT; lbl.TextTruncate = Enum.TextTruncate.AtEnd
+
+    local estado = Instance.new("TextLabel", b)
+    estado.Size = UDim2.new(0, 44, 1, 0); estado.Position = UDim2.new(1, -50, 0, 0)
+    estado.BackgroundTransparency = 1; estado.Font = "SourceSansBold"; estado.TextSize = 13
+    estado.TextColor3 = COL_DIM; estado.Text = "OFF"
+
+    b.MouseButton1Click:Connect(function()
+        if id == "AimbotForte" then cfg.AimbotMode = (cfg.AimbotMode == "Forte") and "None" or "Forte"
+        elseif id == "AimbotFraco" then cfg.AimbotMode = (cfg.AimbotMode == "Fraco") and "None" or "Fraco"
+        elseif id == "NpcAimbotForte" then cfg.NpcAimbotMode = (cfg.NpcAimbotMode == "Forte") and "None" or "Forte"
+        elseif id == "NpcAimbotFraco" then cfg.NpcAimbotMode = (cfg.NpcAimbotMode == "Fraco") and "None" or "Fraco"
+        elseif id == "Spin" then
+            cfg.Spin = not cfg.Spin
+            if cfg.Spin then startSpin() else stopSpin() end
+        elseif id == "AntiKick" then
+            cfg.AntiKick = not cfg.AntiKick
+            if cfg.AntiKick then setupAntiKick() end
+        elseif id == "SpeedOn" then
+            cfg.SpeedOn = not cfg.SpeedOn
+            if not cfg.SpeedOn then
+                local char = LocalPlayer.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                if hum then hum.WalkSpeed = 16 end
+            end
+        elseif id == "MaxProt" then
+            cfg.MaxProt = not cfg.MaxProt
+            if cfg.MaxProt then
+                cfg.AntiKick = true; cfg.AutoReconnect = true; cfg.AntiAFK = true
+                cfg.AntiScreenshot = true; cfg.AntiDetector = true; cfg.God = true
+                setupAntiKick()
+            end
+        else cfg[id] = not cfg[id] end
+    end)
+
+    local last = nil
+    RunService.RenderStepped:Connect(function()
+        if not vivo() then return end
+        local act = (id == "AimbotForte" and cfg.AimbotMode == "Forte")
+            or (id == "AimbotFraco" and cfg.AimbotMode == "Fraco")
+            or (id == "NpcAimbotForte" and cfg.NpcAimbotMode == "Forte")
+            or (id == "NpcAimbotFraco" and cfg.NpcAimbotMode == "Fraco")
+            or (cfg[id] == true)
+        if act == last then return end
+        last = act
+        lbl.Text = name
+        lbl.TextColor3 = act and Color3.fromRGB(0, 255, 90) or COL_TXT
+        estado.Text = act and "ON" or "OFF"
+        estado.TextColor3 = act and Color3.fromRGB(0, 255, 90) or COL_DIM
+        st.Color = act and Color3.fromRGB(0, 130, 45) or COL_ROW_STROKE
+        b.BackgroundColor3 = act and Color3.fromRGB(32, 20, 46) or COL_ROW
+    end)
+end
+
+local function addTargetBtn(name, part, p, key)
+    key = key or "TargetPart"
+    local b = Instance.new("TextButton", p)
+    b.Size = UDim2.new(1, -8, 0, 34); b.BackgroundColor3 = COL_ROW
+    b.Text = name; b.TextColor3 = COL_TXT; b.Font = "SourceSansBold"; b.TextSize = 13
+    b.AutoButtonColor = false; b.LayoutOrder = nextOrder(p)
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    local st = Instance.new("UIStroke", b); st.Color = COL_ROW_STROKE; st.Thickness = 1
+    b.MouseButton1Click:Connect(function() cfg[key] = part end)
+    RunService.RenderStepped:Connect(function()
+        if not vivo() then return end
+        local act = (cfg[key] == part)
+        b.TextColor3 = act and COL_GREEN or COL_TXT
+        st.Color = act and COL_GREEN or COL_ROW_STROKE
+    end)
+end
+
+local function addStepper(name, key, min, max, p, step, isDecimal)
+    local f = Instance.new("Frame", p); f.Size = UDim2.new(1, -8, 0, 50); f.BackgroundColor3 = COL_ROW
+    f.LayoutOrder = nextOrder(p)
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 8)
+    local st = Instance.new("UIStroke", f); st.Color = COL_ROW_STROKE; st.Thickness = 1
+    local l = Instance.new("TextLabel", f); l.Size = UDim2.new(1, -100, 1, 0); l.Position = UDim2.new(0, 12, 0, 0); l.Text = name
+    l.TextColor3 = COL_TXT; l.BackgroundTransparency = 1; l.Font = "SourceSansBold"; l.TextSize = 13; l.TextXAlignment = "Left"
+    local v = Instance.new("TextLabel", f); v.Size = UDim2.new(0, 60, 1, 0); v.Position = UDim2.new(1, -126, 0, 0)
+    v.Text = isDecimal and string.format("%.2f", cfg[key]) or tostring(cfg[key])
+    v.TextColor3 = COL_GREEN; v.BackgroundTransparency = 1; v.Font = "SourceSansBold"; v.TextSize = 15
+    local m = Instance.new("TextButton", f); m.Size = UDim2.new(0, 28, 0, 28); m.Position = UDim2.new(1, -60, 0.5, -14); m.Text = "–"
+    m.BackgroundColor3 = Color3.fromRGB(30, 38, 30); m.TextColor3 = COL_TXT; m.TextSize = 18; m.Font = "SourceSansBold"
+    Instance.new("UICorner", m).CornerRadius = UDim.new(0, 6)
+    local pl = Instance.new("TextButton", f); pl.Size = UDim2.new(0, 28, 0, 28); pl.Position = UDim2.new(1, -28, 0.5, -14); pl.Text = "+"
+    pl.BackgroundColor3 = Color3.fromRGB(30, 38, 30); pl.TextColor3 = COL_TXT; pl.TextSize = 18; pl.Font = "SourceSansBold"
+    Instance.new("UICorner", pl).CornerRadius = UDim.new(0, 6)
+
+    local debounce = false
+    local function updateValue(delta)
+        if debounce then return end
+        debounce = true
+        local newVal = math.clamp(cfg[key] + delta, min, max)
+        if cfg[key] ~= newVal then
+            cfg[key] = newVal
+            v.Text = isDecimal and string.format("%.2f", cfg[key]) or tostring(math.floor(cfg[key]))
+        end
+        task.wait(0.1)
+        debounce = false
+    end
+
+    m.MouseButton1Down:Connect(function() updateValue(-(step or 5)) end)
+    pl.MouseButton1Down:Connect(function() updateValue(step or 5) end)
+end
+
+local function addCreditText(text, p)
+    local l = Instance.new("TextLabel", p); l.Size = UDim2.new(1, -8, 0, 28); l.BackgroundColor3 = COL_ROW
+    l.Text = text; l.TextColor3 = COL_TXT; l.Font = "SourceSansBold"; l.TextSize = 14
+    l.LayoutOrder = nextOrder(p)
+    Instance.new("UICorner", l).CornerRadius = UDim.new(0, 8)
+end
+
+local function addSection(text, p)
+    local l = Instance.new("TextLabel", p); l.Size = UDim2.new(1, -8, 0, 24); l.BackgroundTransparency = 1
+    l.Text = text; l.TextColor3 = COL_DIM; l.Font = "SourceSansItalic"; l.TextSize = 13
+    l.TextXAlignment = "Left"; l.LayoutOrder = nextOrder(p)
+end
+
+local function addInfo(text, p)
+    local l = Instance.new("TextLabel", p); l.Size = UDim2.new(1, -8, 0, 34); l.BackgroundTransparency = 1
+    l.Text = text; l.TextColor3 = COL_DIM; l.Font = "SourceSansItalic"; l.TextSize = 11
+    l.TextWrapped = true; l.TextXAlignment = "Left"; l.LayoutOrder = nextOrder(p)
+end
+
+local function addBotao(text, p, fn)
+    local b = Instance.new("TextButton", p)
+    b.Size = UDim2.new(1, -8, 0, 40); b.BackgroundColor3 = Color3.fromRGB(88, 36, 150)
+    b.Text = text; b.TextColor3 = Color3.new(1,1,1); b.Font = "SourceSansBold"; b.TextSize = 14
+    b.AutoButtonColor = false; b.LayoutOrder = nextOrder(p)
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    b.MouseButton1Click:Connect(fn)
+    return b
+end
+
+-- ================= TELEPORTE =================
+local tpFrame = Instance.new("Frame", mainGui)
+tpFrame.Size = UDim2.new(0, 270, 0, 320); tpFrame.Position = UDim2.new(0.5, -135, 0.5, -160)
+tpFrame.BackgroundColor3 = COL_BG; tpFrame.Visible = false; tpFrame.ZIndex = 9000
+tpFrame.ClipsDescendants = true
+Instance.new("UICorner", tpFrame).CornerRadius = UDim.new(0, 8)
+local tpStroke = Instance.new("UIStroke", tpFrame); tpStroke.Color = COL_GREEN; tpStroke.Thickness = 2
+
+local tpHeader = Instance.new("Frame", tpFrame)
+tpHeader.Size = UDim2.new(1, 0, 0, 38); tpHeader.Position = UDim2.new(0, 0, 0, 0)
+tpHeader.BackgroundColor3 = Color3.fromRGB(20, 12, 30); tpHeader.BackgroundTransparency = 0.15
+tpHeader.Active = true; tpHeader.ZIndex = 9001
+Instance.new("UICorner", tpHeader).CornerRadius = UDim.new(0, 8)
+makeDraggable(tpHeader, tpFrame)
+
+local tpTitle = Instance.new("TextLabel", tpHeader)
+tpTitle.Size = UDim2.new(1, -70, 1, 0); tpTitle.Position = UDim2.new(0, 12, 0, 0)
+tpTitle.BackgroundTransparency = 1; tpTitle.Text = "TELEPORTE  ⋮⋮"; tpTitle.TextColor3 = COL_GREEN
+tpTitle.Font = "SourceSansBold"; tpTitle.TextSize = 16; tpTitle.TextXAlignment = "Left"; tpTitle.ZIndex = 9001
+
+local tpClose = Instance.new("TextButton", tpHeader)
+tpClose.Size = UDim2.new(0, 26, 0, 26); tpClose.Position = UDim2.new(1, -34, 0, 6)
+tpClose.BackgroundTransparency = 1; tpClose.Text = "✕"; tpClose.TextColor3 = COL_TXT
+tpClose.Font = "SourceSansBold"; tpClose.TextSize = 16; tpClose.ZIndex = 9001
+
+local tpVoltar = Instance.new("TextButton", tpHeader)
+tpVoltar.Size = UDim2.new(0, 110, 0, 24); tpVoltar.Position = UDim2.new(1, -148, 0, 7)
+tpVoltar.BackgroundColor3 = Color3.fromRGB(40, 24, 60); tpVoltar.Text = "VOLTAR P/ MIM"
+tpVoltar.TextColor3 = COL_GREEN; tpVoltar.Font = "SourceSansBold"; tpVoltar.TextSize = 11
+tpVoltar.AutoButtonColor = false; tpVoltar.ZIndex = 9001
+Instance.new("UICorner", tpVoltar).CornerRadius = UDim.new(0, 5)
+
+local tpList = Instance.new("ScrollingFrame", tpFrame)
+tpList.Size = UDim2.new(1, -16, 1, -54); tpList.Position = UDim2.new(0, 8, 0, 44)
+tpList.BackgroundTransparency = 1; tpList.BorderSizePixel = 0
+tpList.ScrollingDirection = Enum.ScrollingDirection.Y
+tpList.ScrollBarThickness = 5; tpList.ScrollBarImageColor3 = COL_GREEN
+tpList.CanvasSize = UDim2.new(0, 0, 0, 0)
+tpList.ZIndex = 9001
+local tpPad = Instance.new("UIPadding", tpList); tpPad.PaddingBottom = UDim.new(0, 8)
+local tpLayout = Instance.new("UIListLayout", tpList)
+tpLayout.Padding = UDim.new(0, 6); tpLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local function atualizarCanvasTP()
+    tpList.CanvasSize = UDim2.new(0, 0, 0, tpLayout.AbsoluteContentSize.Y + 10)
+end
+tpLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(atualizarCanvasTP)
+
+local function voltarCamera()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        Camera.CameraSubject = hum
+        Camera.CameraType = Enum.CameraType.Custom
+    end
+end
+
+local function verJogador(player)
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        Camera.CameraSubject = hum
+        Camera.CameraType = Enum.CameraType.Custom
+    end
+end
+
+local function teleportarPara(player)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local alvo = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp or not alvo then return end
+    local destino = alvo.CFrame * CFrame.new(0, 0, cfg.TpDist)
+    hrp.CFrame = CFrame.new(destino.Position, Vector3.new(alvo.Position.X, destino.Position.Y, alvo.Position.Z))
+    voltarCamera()
+end
+
+local tpRodando = false
+local function montarListaTP()
+    for _, c in ipairs(tpList:GetChildren()) do
+        if c:IsA("Frame") then c:Destroy() end
+    end
+
+    local ordem = 1
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local row = Instance.new("Frame", tpList)
+            row.Size = UDim2.new(1, -8, 0, 44); row.BackgroundColor3 = COL_ROW
+            row.LayoutOrder = ordem; ordem = ordem + 1; row.ZIndex = 9002
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+            local st = Instance.new("UIStroke", row); st.Color = COL_ROW_STROKE; st.Thickness = 1
+
+            local nome = Instance.new("TextLabel", row)
+            nome.Size = UDim2.new(1, -84, 1, 0); nome.Position = UDim2.new(0, 10, 0, 0)
+            nome.BackgroundTransparency = 1; nome.TextXAlignment = "Left"
+            nome.Font = "SourceSansBold"; nome.TextSize = 13
+            nome.TextColor3 = player.Team and player.Team.TeamColor.Color or COL_TXT
+            nome.Text = player.DisplayName .. " (@@" .. player.Name .. ")"
+            nome.TextTruncate = Enum.TextTruncate.AtEnd
+            nome.ZIndex = 9002
+
+            local bVer = Instance.new("TextButton", row)
+            bVer.Size = UDim2.new(0, 34, 0, 30); bVer.Position = UDim2.new(1, -76, 0.5, -15)
+            bVer.BackgroundColor3 = Color3.fromRGB(40, 24, 60); bVer.Text = "👁"
+            bVer.TextColor3 = COL_GREEN; bVer.TextSize = 14; bVer.AutoButtonColor = false; bVer.ZIndex = 9002
+            Instance.new("UICorner", bVer).CornerRadius = UDim.new(0, 6)
+
+            local bTp = Instance.new("TextButton", row)
+            bTp.Size = UDim2.new(0, 34, 0, 30); bTp.Position = UDim2.new(1, -38, 0.5, -15)
+            bTp.BackgroundColor3 = Color3.fromRGB(88, 36, 150); bTp.Text = "📍"
+            bTp.TextColor3 = COL_TXT; bTp.TextSize = 14; bTp.AutoButtonColor = false; bTp.ZIndex = 9002
+            Instance.new("UICorner", bTp).CornerRadius = UDim.new(0, 6)
+
+            bVer.MouseButton1Click:Connect(function() verJogador(player) end)
+            bTp.MouseButton1Click:Connect(function() teleportarPara(player) end)
+        end
+    end
+    atualizarCanvasTP()
+end
+
+local function abrirTP()
+    tpFrame.Visible = true
+    montarListaTP()
+    if not tpRodando then
+        tpRodando = true
+        task.spawn(function()
+            while vivo() and tpFrame.Visible and mainGui.Parent do
+                task.wait(2)
+                if tpFrame.Visible then montarListaTP() end
+            end
+            tpRodando = false
+        end)
+    end
+end
+
+tpClose.MouseButton1Click:Connect(function() tpFrame.Visible = false end)
+tpVoltar.MouseButton1Click:Connect(voltarCamera)
+
+-- ================= NPC (dados) =================
+local npcESP = {}
+
+local function npcRoot(model)
+    return model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+end
+
+local function isNPC(model)
+    if not model:IsA("Model") then return false end
+    if model == LocalPlayer.Character then return false end
+    if not model:FindFirstChildOfClass("Humanoid") then return false end
+    if Players:GetPlayerFromCharacter(model) then return false end
+    return true
+end
+
+local function clearNpcESP()
+    for model, data in pairs(npcESP) do
+        pcall(function()
+            if data.hl then data.hl:Destroy() end
+            if data.bb then data.bb:Destroy() end
+        end)
+        npcESP[model] = nil
+    end
+end
+
+local function trackNPC(model)
+    local root = npcRoot(model)
+    if not root then return end
+
+    local hl = Instance.new("Highlight")
+    hl.Name = "MzNpcESP"
+    hl.FillColor = COL_VIS
+    hl.OutlineColor = Color3.new(1,1,1)
+    hl.FillTransparency = 0.5
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = model
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "MzNpcBB"
+    bb.Size = UDim2.new(0, 150, 0, 26)
+    bb.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
+    bb.AlwaysOnTop = true
+    bb.MaxDistance = 3000
+    bb.Parent = root
+
+    local lbl = Instance.new("TextLabel", bb)
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "[BOT] " .. model.Name
+    lbl.TextColor3 = COL_VIS
+    lbl.Font = "SourceSansBold"
+    lbl.TextSize = 12
+    lbl.TextStrokeTransparency = 0.3
+
+    npcESP[model] = {hl = hl, bb = bb, lbl = lbl, root = root}
+end
+
+local function scanNPCs()
+    local char = LocalPlayer.Character
+    local origin = (char and char:FindFirstChild("HumanoidRootPart")) and char.HumanoidRootPart.Position or Camera.CFrame.Position
+    local maxD = cfg.NpcDist * 1.6
+    local count = 0
+
+    for _, inst in ipairs(workspace:GetDescendants()) do
+        if inst:IsA("Model") and not npcESP[inst] and isNPC(inst) then
+            local root = npcRoot(inst)
+            if root and (root.Position - origin).Magnitude <= maxD then
+                pcall(trackNPC, inst)
+                count = count + 1
+                if count >= 80 then break end
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while vivo() and mainGui.Parent do
+        task.wait(2)
+        if cfg.NpcESP or cfg.NpcAimbotMode ~= "None" or cfg.UmTiro then
+            pcall(scanNPCs)
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not vivo() then return end
+    if not (cfg.NpcESP or cfg.NpcAimbotMode ~= "None") then
+        if next(npcESP) then clearNpcESP() end
+        return
+    end
+    local origin = Camera.CFrame.Position
+    for model, data in pairs(npcESP) do
+        pcall(function()
+            local root = data.root
+            if not root or not root.Parent then
+                data.hl:Destroy(); data.bb:Destroy()
+                npcESP[model] = nil
+                return
+            end
+            local d = (root.Position - origin).Magnitude
+            if d > cfg.NpcDist then
+                data.hl:Destroy(); data.bb:Destroy()
+                npcESP[model] = nil
+                return
+            end
+            data.hl.Enabled = cfg.NpcESP
+            data.bb.Enabled = cfg.NpcESP
+            data.lbl.Text = string.format("[BOT] %s  •  %dm", model.Name, math.floor(d))
+        end)
+    end
+end)
+
+-- ================= ESP DE CARROS =================
+local carESP = {}
+
+local CAR_KEYWORDS = {
+    "car", "veiculo", "veículo", "vehicle", "truck", "caminh", "bike", "moto",
+    "bus", "onibus", "ônibus", "jeep", "suv", "taxi", "táxi", "kart", "boat",
+    "barco", "plane", "aviao", "avião", "heli", "tank", "van", "pickup"
+}
+
+local function nameIsCar(inst)
+    local n = inst.Name:lower()
+    for _, k in ipairs(CAR_KEYWORDS) do
+        if n:find(k, 1, true) then return true end
+    end
+    return false
+end
+
+local function isVehicle(inst)
+    if inst:IsA("Model") then
+        if nameIsCar(inst) then return true end
+        if inst:FindFirstChildWhichIsA("VehicleSeat", true) then return true end
+        if inst:FindFirstChildWhichIsA("HingeConstraint", true) and inst.PrimaryPart then return true end
+        return false
+    elseif inst:IsA("BasePart") then
+        return nameIsCar(inst)
+    end
+    return false
+end
+
+local function carRoot(inst)
+    if inst:IsA("BasePart") then return inst end
+    return inst.PrimaryPart or inst:FindFirstChildWhichIsA("BasePart")
+end
+
+local function clearCarESP()
+    for inst, data in pairs(carESP) do
+        pcall(function()
+            if data.hl then data.hl:Destroy() end
+            if data.bb then data.bb:Destroy() end
+        end)
+        carESP[inst] = nil
+    end
+end
+
+local function trackCar(inst)
+    local root = carRoot(inst)
+    if not root then return end
+
+    local hl = Instance.new("Highlight")
+    hl.Name = "MzCarESP"
+    hl.FillColor = COL_VIS
+    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+    hl.FillTransparency = 0.55
+    hl.OutlineTransparency = 0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = inst
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "MzCarBB"
+    bb.Size = UDim2.new(0, 140, 0, 26)
+    bb.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
+    bb.AlwaysOnTop = true
+    bb.MaxDistance = 5000
+    bb.Parent = root
+
+    local lbl = Instance.new("TextLabel", bb)
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = inst.Name
+    lbl.TextColor3 = COL_VIS
+    lbl.Font = "SourceSansBold"
+    lbl.TextSize = 12
+    lbl.TextStrokeTransparency = 0.3
+
+    carESP[inst] = {hl = hl, bb = bb, lbl = lbl, root = root}
+end
+
+local function scanCars()
+    local char = LocalPlayer.Character
+    local origin = (char and char:FindFirstChild("HumanoidRootPart")) and char.HumanoidRootPart.Position or Camera.CFrame.Position
+    local maxD = cfg.CarDist * 1.6
+    local found = {}
+    local count = 0
+
+    for _, inst in ipairs(workspace:GetDescendants()) do
+        if inst:IsA("Model") and isVehicle(inst) then
+            local root = carRoot(inst)
+            if root and (root.Position - origin).Magnitude <= maxD then
+                found[inst] = true
+                count = count + 1
+                if count >= 150 then break end
+            end
+        end
+    end
+
+    for inst in pairs(found) do
+        if not carESP[inst] then
+            pcall(trackCar, inst)
+        end
+    end
+end
+
+task.spawn(function()
+    while vivo() and mainGui.Parent do
+        task.wait(2)
+        if cfg.CarESP then
+            pcall(scanCars)
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not vivo() then return end
+    if not cfg.CarESP then
+        if next(carESP) then clearCarESP() end
+        return
+    end
+    local origin = Camera.CFrame.Position
+    for inst, data in pairs(carESP) do
+        pcall(function()
+            local root = data.root
+            if not root or not root.Parent then
+                data.hl:Destroy(); data.bb:Destroy()
+                carESP[inst] = nil
+                return
+            end
+            local d = (root.Position - origin).Magnitude
+            if d > cfg.CarDist then
+                data.hl:Destroy(); data.bb:Destroy()
+                carESP[inst] = nil
+                return
+            end
+            data.lbl.Text = string.format("%s  •  %dm", inst.Name, math.floor(d))
+        end)
+    end
+end)
+
+-- ================= UM TIRO MATA + KILLS =================
+local ultimoTiro = 0
+local kills = 0
+local marcados = {}
+local fixados = {}
+
+local function matarNaMira()
+    local centro = Vector2.new(Camera.ViewportSize.X/2, (Camera.ViewportSize.Y/2) + cfg.FOVPos)
+    local melhor, melhorD = nil, cfg.FOVSize
+
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer then
+            local char = pl.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local alvo = char and (char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart"))
+            if hum and hum.Health > 0 and alvo and not (cfg.SafeTeam and pl.Team == LocalPlayer.Team) then
+                local p, on = Camera:WorldToViewportPoint(alvo.Position)
+                if on then
+                    local d = (Vector2.new(p.X, p.Y) - centro).Magnitude
+                    if d < melhorD and temVisao(alvo) then
+                        melhorD = d
+                        melhor = hum
+                    end
+                end
+            end
+        end
+    end
+
+    if not melhor then
+        for model, data in pairs(npcESP) do
+            local hum = model:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 and data.root then
+                local p, on = Camera:WorldToViewportPoint(data.root.Position)
+                if on then
+                    local d = (Vector2.new(p.X, p.Y) - centro).Magnitude
+                    if d < melhorD and temVisao(data.root) then
+                        melhorD = d
+                        melhor = hum
+                    end
+                end
+            end
+        end
+    end
+
+    if melhor then
+        marcados[melhor] = tick()
+        fixados[melhor] = tick()
+        pcall(function() melhor:TakeDamage(melhor.MaxHealth + 500) end)
+        pcall(function() melhor.Health = 0 end)
+        pcall(function() melhor.PlatformStand = true end)
+        pcall(function() melhor:ChangeState(Enum.HumanoidStateType.Dead) end)
+    end
+end
+
+UserInputService.InputBegan:Connect(function(inp, processado)
+    if not vivo() or processado then return end
+    if inp.UserInputType ~= Enum.UserInputType.MouseButton1 and inp.UserInputType ~= Enum.UserInputType.Touch then return end
+    if not cfg.UmTiro then return end
+    if tick() - ultimoTiro < 0.15 then return end
+    ultimoTiro = tick()
+    task.spawn(matarNaMira)
+end)
+
+-- segura o alvo caído por 6s
+task.spawn(function()
+    while vivo() and mainGui.Parent do
+        task.wait(0.12)
+        for hum, quando in pairs(fixados) do
+            if hum.Parent == nil or (tick() - quando) > 6 then
+                fixados[hum] = nil
+            else
+                pcall(function() hum.Health = 0 end)
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while vivo() and mainGui.Parent do
+        task.wait(0.4)
+        for hum, quando in pairs(marcados) do
+            if (tick() - quando) > 8 then
+                marcados[hum] = nil
+            elseif hum.Parent == nil or hum.Health <= 0 then
+                kills = kills + 1
+                hudKills.Text = tostring(kills)
+                marcados[hum] = nil
+            end
+        end
+    end
+end)
+
+-- ================= ANTI BAN =================
+local kickLogs = {}
+local kickLogBox, kickStatus
+
+local function logKick(msg)
+    table.insert(kickLogs, 1, "• " .. tostring(msg))
+    if #kickLogs > 5 then table.remove(kickLogs) end
+    local txt = ""
+    for _, l in pairs(kickLogs) do txt = txt .. l .. "\n" end
+    if kickLogBox then kickLogBox.Text = txt end
+end
+
+local kicksSeguidos = 0
+local ultimoKick = 0
+
+local mtGlobal, namecallAntigo
+local function soltarHooks()
+    pcall(function()
+        if mtGlobal and namecallAntigo then
+            setreadonly(mtGlobal, false)
+            mtGlobal.__namecall = namecallAntigo
+            setreadonly(mtGlobal, true)
+        end
+    end)
+    mtGlobal = nil
+    namecallAntigo = nil
+    cfg._antiKickHooked = false
+    cfg.HookPesado = false
+    if kickStatus then
+        kickStatus.Text = "Ganchos soltos (modo limpo)"
+        kickStatus.TextColor3 = Color3.new(1, 0.6, 0)
+    end
+end
+
+local function reconectarInteligente()
+    if cfg._rejoining then return end
+    cfg._rejoining = true
+
+    local agora = tick()
+    if (agora - ultimoKick) < 90 then
+        kicksSeguidos = kicksSeguidos + 1
+    else
+        kicksSeguidos = 1
+    end
+    ultimoKick = agora
+
+    if kicksSeguidos >= 2 then
+        logKick("2 kicks seguidos - trocando de servidor")
+        soltarHooks()
+        task.wait(0.4)
+        if cfg.AutoTrocarServidor then
+            pcall(function() TeleportService:Teleport(game.PlaceId) end)
+        else
+            pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end)
+        end
+    else
+        logKick("reconectando no mesmo servidor")
+        pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end)
+    end
+
+    task.wait(7)
+    cfg._rejoining = false
+end
+
+local function queueRejoin()
+    if cfg._rejoining then return end
+    cfg._rejoining = true
+    task.delay(3, function()
+        pcall(function()
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+        end)
+        task.wait(8)
+        cfg._rejoining = false
+    end)
+end
+
+function setupAntiKick()
+    if cfg._antiKickHooked then return true end
+
+    local ok = false
+
+    if hookfunction and newcclosure then
+        ok = pcall(function()
+            local antigo = LocalPlayer.Kick
+            hookfunction(antigo, newcclosure(function(self, msg)
+                if cfg.AntiKick then
+                    logKick(tostring(msg or "sem mensagem"))
+                    task.spawn(reconectarInteligente)
+                    return
+                end
+                return antigo(self, msg)
+            end))
+        end)
+    end
+
+    if cfg.HookPesado then
+        pcall(function()
+            local mt = getrawmetatable(game)
+            if not mt or not mt.__namecall then return end
+            mtGlobal = mt
+            namecallAntigo = mt.__namecall
+            local eraRO = true
+            pcall(function() eraRO = isreadonly(mt) end)
+            setreadonly(mt, false)
+            mt.__namecall = newcclosure(function(self, ...)
+                if getnamecallmethod() == "Kick" and self == LocalPlayer then
+                    if cfg.AntiKick then
+                        local args = { ... }
+                        logKick(tostring(args[1] or "sem mensagem"))
+                        task.spawn(reconectarInteligente)
+                        return
+                    end
+                end
+                return namecallAntigo(self, ...)
+            end)
+            setreadonly(mt, eraRO)
+            ok = true
+        end)
+    end
+
+    cfg._antiKickHooked = ok
+    if kickStatus then
+        kickStatus.Text = ok and "Hook ativo" or "Hook indisponível (usar rejoin)"
+        kickStatus.TextColor3 = ok and Color3.new(0,1,0) or Color3.new(1,0.6,0)
+    end
+    return ok
+end
+
+task.spawn(function()
+    task.wait(1)
+    if cfg.AntiKick then setupAntiKick() end
+end)
+
+task.spawn(function()
+    while vivo() do
+        task.wait(10)
+        if (tick() - ultimoKick) > 120 then kicksSeguidos = 0 end
+    end
+end)
+
+pcall(function()
+    LocalPlayer:GetPropertyChangedSignal("Parent"):Connect(function()
+        if not vivo() then return end
+        if LocalPlayer.Parent == nil and cfg.AutoReconnect then
+            task.delay(1.5, function()
+                if LocalPlayer.Parent == nil then
+                    task.spawn(reconectarInteligente)
+                end
+            end)
+        end
+    end)
+end)
+
+local falhasSeguidas = 0
+task.spawn(function()
+    while vivo() and mainGui.Parent do
+        task.wait(5)
+        if cfg.AutoReconnect and not cfg._rejoining then
+            if LocalPlayer.Parent == nil then
+                falhasSeguidas = falhasSeguidas + 1
+                if falhasSeguidas >= 2 then
+                    falhasSeguidas = 0
+                    reconectarInteligente()
+                end
+            else
+                falhasSeguidas = 0
+            end
+        end
+    end
+end)
+
+pcall(function()
+    LocalPlayer.Idled:Connect(function()
+        if not vivo() then return end
+        if cfg.AntiAFK then
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        end
+    end)
+end)
+
+task.spawn(function()
+    while vivo() and mainGui.Parent do
+        task.wait(45)
+        if cfg.AntiAFK then
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    local sg = LocalPlayer:WaitForChild("PlayerGui")
+    local hudSS = sg:WaitForChild("ScreenshotHud", 15)
+    if not hudSS then return end
+    cfg._screenshotHud = hudSS
+    local function check()
+        if not vivo() then return end
+        if not cfg.AntiScreenshot then return end
+        local ativo = false
+        pcall(function()
+            ativo = hudSS.Enabled and hudSS.Visible
+        end)
+        if ativo then
+            main.Visible = false
+            bubble.Visible = false
+            tpFrame.Visible = false
+            hud.Visible = false
+        else
+            if not cfg.Stealth then bubble.Visible = true; hud.Visible = true end
+        end
+    end
+    pcall(function() hudSS:GetPropertyChangedSignal("Enabled"):Connect(check) end)
+    pcall(function() hudSS:GetPropertyChangedSignal("Visible"):Connect(check) end)
+end)
+
+task.spawn(function()
+    while vivo() do
+        task.wait(1)
+        if cfg.AntiDetector then
+            local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+            if pg then
+                if not mainGui.Parent then pcall(function() mainGui.Parent = pg end) end
+                if not mainGui.Enabled then pcall(function() mainGui.Enabled = true end) end
+                if not bubble.Parent then pcall(function() bubble.Parent = mainGui end) end
+                if not hud.Parent then pcall(function() hud.Parent = mainGui end) end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while vivo() and mainGui.Parent do
+        task.wait(0.4)
+        if cfg.God then
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.MaxHealth = math.huge
+                hum.Health = math.huge
+            end
+        end
+    end
+end)
+
+-- IMORTAL
+local function ligarImortal(char)
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    pcall(function()
+        hum.Died:Connect(function()
+            if not cfg.Imortal then return end
+            task.delay(0.15, function()
+                pcall(function()
+                    if hum.Parent then
+                        hum.Health = hum.MaxHealth
+                        hum.PlatformStand = false
+                    end
+                end)
+            end)
+        end)
+    end)
+end
+
+if LocalPlayer.Character then ligarImortal(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    ligarImortal(char)
+end)
+
+task.spawn(function()
+    while vivo() and mainGui.Parent do
+        task.wait(0.1)
+        if cfg.Imortal then
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 and hum.Health < hum.MaxHealth then
+                pcall(function() hum.Health = hum.MaxHealth end)
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while vivo() and mainGui.Parent do
+        task.wait(0.15)
+        if cfg.SpeedOn then
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum and hum.WalkSpeed ~= cfg.Speed then
+                hum.WalkSpeed = cfg.Speed
+            end
+        end
+    end
+end)
+
+-- MODO AFK: corpo travado, você sai como fantasma
+task.spawn(function()
+    local fantasma = false
+    while vivo() and mainGui.Parent do
+        task.wait(0.05)
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hum and hrp then
+            if cfg.ModoAFK then
+                if not fantasma then
+                    fantasma = true
+                    Camera.CameraType = Enum.CameraType.Scriptable
+                end
+                if not hrp.Anchored then hrp.Anchored = true end
+                local mv = hum.MoveDirection
+                if mv.Magnitude > 0.05 then
+                    Camera.CFrame = Camera.CFrame + mv.Unit * 2.4
+                end
+            elseif fantasma then
+                fantasma = false
+                hrp.Anchored = false
+                Camera.CameraType = Enum.CameraType.Custom
+                Camera.CameraSubject = hum
+            end
+        end
+    end
+end)
+
+-- ACELERAR VEÍCULO (força física, não mexe na velocidade atual)
+local bodyVel = nil
+task.spawn(function()
+    while vivo() and mainGui.Parent do
+        task.wait(0.1)
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local assento = hum and hum.SeatPart
+        if cfg.VeiculoTurbo and assento then
+            if not bodyVel or bodyVel.Parent ~= assento then
+                if bodyVel then pcall(function() bodyVel:Destroy() end) end
+                bodyVel = Instance.new("BodyVelocity")
+                bodyVel.MaxForce = Vector3.new(120000, 0, 120000)
+                bodyVel.P = 4000
+                bodyVel.Parent = assento
+            end
+            bodyVel.Velocity = assento.CFrame.LookVector * cfg.VeiculoVel
+        elseif bodyVel then
+            pcall(function() bodyVel:Destroy() end)
+            bodyVel = nil
+        end
+    end
+end)
+
+local function safeLoop(fn)
+    return function(...)
+        local ok, err = pcall(fn, ...)
+        if not ok then end
+    end
+end
+
+-- ================= AIMBOT =================
+local function loopAimbot()
+    local querJogador = (cfg.AimbotMode ~= "None" and cfg.FOV)
+    local querNpc = (cfg.NpcAimbotMode ~= "None" and cfg.NpcFOV)
+    if not querJogador and not querNpc then return end
+
+    local meuChar = LocalPlayer.Character
+    local meuRoot = meuChar and meuChar:FindFirstChild("HumanoidRootPart")
+
+    local target = nil
+    local dist = cfg.FOVSize
+    local center = Vector2.new(Camera.ViewportSize.X/2, (Camera.ViewportSize.Y/2) + cfg.FOVPos)
+
+    if querJogador then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local char = player.Character
+                local isTeammate = (player.Team == LocalPlayer.Team)
+                if char and not (cfg.SafeTeam and isTeammate) then
+                    local humanoid = char:FindFirstChild("Humanoid")
+                    if humanoid and humanoid.Health > 0 then
+                        local part = getPrecisePart(char, cfg.TargetPart)
+                        if part then
+                            local perto = true
+                            if cfg.AimNear and meuRoot then
+                                perto = (part.Position - meuRoot.Position).Magnitude <= cfg.AimDist
+                            end
+                            if perto and (not cfg.AimVisible or temVisao(part)) then
+                                local pos, vis = Camera:WorldToViewportPoint(part.Position)
+                                if vis then
+                                    local mDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                                    if mDist <= cfg.FOVSize and mDist < dist then
+                                        dist = mDist
+                                        target = part
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if querNpc then
+        for model, data in pairs(npcESP) do
+            pcall(function()
+                local root = data.root
+                if root and root.Parent then
+                    local hum = model:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.Health > 0 then
+                        local part = getPrecisePart(model, cfg.NpcTarget)
+                        if part then
+                            local perto = true
+                            if cfg.AimNear and meuRoot then
+                                perto = (part.Position - meuRoot.Position).Magnitude <= cfg.AimDist
+                            end
+                            if perto and (not cfg.AimVisible or temVisao(part)) then
+                                local pos, vis = Camera:WorldToViewportPoint(part.Position)
+                                if vis then
+                                    local mDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                                    if mDist <= cfg.FOVSize and mDist < dist then
+                                        dist = mDist
+                                        target = part
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+
+    if target then
+        fovStroke.Color = COL_VIS
+        local forca = (cfg.AimbotMode == "Forte" or cfg.NpcAimbotMode == "Forte") and 1 or 0.2
+        local atual = Camera.CFrame
+        local nova = CFrame.new(atual.Position, target.Position)
+        if forca >= 1 then
+            Camera.CFrame = nova
+        else
+            Camera.CFrame = atual:Lerp(nova, forca)
+        end
+    end
+end
+
+pcall(function() RunService:UnbindFromRenderStep("MzAimbot") end)
+pcall(function()
+    RunService:BindToRenderStep("MzAimbot", Enum.RenderPriority.Camera.Value + 1, safeLoop(loopAimbot))
+end)
+
+-- ========== MENU ==========
+local avatar = Instance.new("ImageLabel", cHome)
+avatar.Size = UDim2.new(0, 96, 0, 96); avatar.Position = UDim2.new(0.5, -48, 0, 8)
+avatar.BackgroundColor3 = COL_ROW; avatar.Image = ""
+Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
+local avStroke = Instance.new("UIStroke", avatar); avStroke.Color = COL_GREEN; avStroke.Thickness = 2
+
+task.spawn(function()
+    local ok, url = pcall(function()
+        return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+    end)
+    if ok and url then avatar.Image = url end
+end)
+
+local bemVindo = Instance.new("TextLabel", cHome)
+bemVindo.Size = UDim2.new(1, 0, 0, 20); bemVindo.Position = UDim2.new(0, 0, 0, 112)
+bemVindo.BackgroundTransparency = 1; bemVindo.Text = "Bem-vindo, " .. LocalPlayer.DisplayName
+bemVindo.Font = "SourceSansBold"; bemVindo.TextSize = 15; bemVindo.TextColor3 = COL_TXT
+
+local devLabel = Instance.new("TextLabel", cHome)
+devLabel.Size = UDim2.new(1, 0, 0, 18); devLabel.Position = UDim2.new(0, 0, 0, 134)
+devLabel.BackgroundTransparency = 1; devLabel.Text = "Desenvolvedor - By mz.studio"
+devLabel.Font = "SourceSansItalic"; devLabel.TextSize = 12; devLabel.TextColor3 = COL_DIM
+
+local contBox = Instance.new("Frame", cHome)
+contBox.Size = UDim2.new(0, 200, 0, 44); contBox.Position = UDim2.new(0.5, -100, 0, 162)
+contBox.BackgroundColor3 = COL_ROW; contBox.BorderSizePixel = 0
+Instance.new("UICorner", contBox).CornerRadius = UDim.new(0, 8)
+local contStroke = Instance.new("UIStroke", contBox); contStroke.Color = COL_GREEN; contStroke.Thickness = 1; contStroke.Transparency = 0.4
+local contLabel = Instance.new("TextLabel", contBox)
+contLabel.Size = UDim2.new(1, 0, 1, 0); contLabel.BackgroundTransparency = 1
+contLabel.Text = "0 JOGADORES"; contLabel.Font = "SourceSansBold"; contLabel.TextSize = 17; contLabel.TextColor3 = COL_GREEN
+
+local btnDiscordHome = Instance.new("TextButton", cHome)
+btnDiscordHome.Size = UDim2.new(0, 200, 0, 38); btnDiscordHome.Position = UDim2.new(0.5, -100, 0, 218)
+btnDiscordHome.BackgroundColor3 = Color3.fromRGB(88, 101, 242); btnDiscordHome.Text = "COPIAR DISCORD"
+btnDiscordHome.TextColor3 = Color3.new(1,1,1); btnDiscordHome.Font = "SourceSansBold"; btnDiscordHome.TextSize = 13
+btnDiscordHome.AutoButtonColor = false
+Instance.new("UICorner", btnDiscordHome).CornerRadius = UDim.new(0, 8)
+btnDiscordHome.MouseButton1Click:Connect(function()
+    if setclipboard then
+        setclipboard("https://discord.gg/q8gpA7CnF")
+        btnDiscordHome.Text = "COPIADO!"
+        task.delay(2, function() btnDiscordHome.Text = "COPIAR DISCORD" end)
+    end
+end)
+
+local notaBug = Instance.new("TextLabel", cHome)
+notaBug.Size = UDim2.new(1, -20, 0, 40); notaBug.Position = UDim2.new(0, 10, 0, 266)
+notaBug.BackgroundTransparency = 1; notaBug.Text = "Achou bug? Manda no Discord."
+notaBug.TextWrapped = true; notaBug.Font = "SourceSansItalic"; notaBug.TextSize = 11; notaBug.TextColor3 = COL_DIM
+
+addSection("JOGADORES", cPvpTab)
+addToggle("ESP + LINHAS", "ESP", cPvpTab, false)
+addToggle("AIMBOT FORTE", "AimbotForte", cPvpTab, false)
+addToggle("AIMBOT FRACO", "AimbotFraco", cPvpTab, false)
+addToggle("MOSTRAR FOV", "FOV", cPvpTab, false)
+addToggle("IGNORAR TIME", "SafeTeam", cPvpTab, false)
+addSection("DANO E VIDA", cPvpTab)
+addToggle("UM TIRO MATA", "UmTiro", cPvpTab, false)
+addToggle("IMORTAL", "Imortal", cPvpTab, false)
+addInfo("Um tiro derruba e segura o alvo caído. Imortal te cura ao levar tiro.", cPvpTab)
+addSection("FOCO DE MIRA", cPvpTab)
+addTargetBtn("CABEÇA", "Head", cPvpTab)
+addTargetBtn("PEITO", "Torso", cPvpTab)
+addTargetBtn("BRAÇO DIREITO", "RightArm", cPvpTab)
+addTargetBtn("BRAÇO ESQUERDO", "LeftArm", cPvpTab)
+addTargetBtn("PERNAS", "Legs", cPvpTab)
+
+addSection("VELOCIDADE", cPlayerTab)
+addToggle("VELOCIDADE", "SpeedOn", cPlayerTab, false)
+addStepper("VELOCIDADE (STUDS)", "Speed", 16, 300, cPlayerTab, 10)
+addSection("AFK", cPlayerTab)
+addToggle("MODO AFK", "ModoAFK", cPlayerTab, false)
+addInfo("Seu corpo fica parado no lugar e você sai como fantasma pela câmera.", cPlayerTab)
+addSection("AIMBOT", cPlayerTab)
+addToggle("SÓ MIRA NA MINHA VISÃO", "AimVisible", cPlayerTab, false)
+addToggle("LIMITAR POR DISTÂNCIA", "AimNear", cPlayerTab, false)
+addStepper("DISTÂNCIA DO AIMBOT", "AimDist", 10, 500, cPlayerTab, 10)
+addSection("FOV", cPlayerTab)
+addStepper("TAMANHO FOV", "FOVSize", 10, 800, cPlayerTab, 10)
+addStepper("ALINHADOR FOV", "FOVPos", -300, 300, cPlayerTab, 5)
+
+addSection("PAINEL", cVis)
+addToggle("LED RGB", "LEDActive", cVis, false)
+addToggle("TRANSPARÊNCIA DO PAINEL", "Transp", cVis, false)
+addStepper("VELOCIDADE DO LED", "LEDSpeed", 1, 50, cVis, 1)
+addSection("COR", cVis)
+addStepper("COR R", "R", 0, 255, cVis, 5)
+addStepper("COR G", "G", 0, 255, cVis, 5)
+addStepper("COR B", "B", 0, 255, cVis, 5)
+addSection("OUTROS", cVis)
+addToggle("GIRAR", "Spin", cVis, false)
+
+addSection("CARROS", cVei)
+addToggle("ESP DE CARROS", "CarESP", cVei, false)
+addStepper("DISTÂNCIA CARRO", "CarDist", 50, 5000, cVei, 50)
+addSection("ACELERAÇÃO", cVei)
+addToggle("ACELERAR VEÍCULO", "VeiculoTurbo", cVei, false)
+addStepper("VELOCIDADE DO VEÍCULO", "VeiculoVel", 30, 400, cVei, 10)
+addInfo("Empurra o carro pela física. Se ficar fraco, aumenta a velocidade.", cVei)
+
+addSection("JOGADORES", cTp)
+addBotao("ABRIR TELEPORTE", cTp, function() abrirTP() end)
+addInfo("👁 ver o jogador, 📍 teleportar. Arraste a janela pela barra do topo.", cTp)
+addSection("AJUSTE", cTp)
+addStepper("DISTÂNCIA DO TELEPORTE", "TpDist", 3, 40, cTp, 1)
+
+addSection("PROTEÇÃO DO HUB", cMisc)
+addToggle("PROTEÇÃO MÁXIMA", "MaxProt", cMisc, false)
+addToggle("ANTI DETECTOR (UI)", "AntiDetector", cMisc, true)
+addToggle("TROCAR DE SERVIDOR NO 2º KICK", "AutoTrocarServidor", cMisc, true)
+addToggle("HOOK NAMECALL (PESADO)", "HookPesado", cMisc, false)
+addInfo("1º kick volta no mesmo servidor. 2º kick solta os ganchos e troca de servidor.", cMisc)
+addToggle("Modo Stealth (Esconder UI)", "Stealth", cMisc, false)
+addToggle("Anti Kick", "AntiKick", cMisc, true)
+addToggle("Anti AFK", "AntiAFK", cMisc, true)
+addToggle("Anti ScreenShot", "AntiScreenshot", cMisc, true)
+addToggle("Auto Rejoin", "AutoReconnect", cMisc, true)
+addToggle("Modo Deus (invencível)", "God", cMisc, false)
+
+kickStatus = Instance.new("TextLabel", cMisc)
+kickStatus.LayoutOrder = nextOrder(cMisc)
+kickStatus.Size = UDim2.new(1, -8, 0, 20); kickStatus.BackgroundTransparency = 1
+kickStatus.Text = "Hook: aguardando ativação"; kickStatus.TextColor3 = COL_DIM; kickStatus.TextSize = 12; kickStatus.Font = "SourceSansItalic"
+kickStatus.TextXAlignment = "Left"
+
+local kickRow = Instance.new("TextButton", cMisc)
+kickRow.Size = UDim2.new(1, -8, 0, 50); kickRow.BackgroundColor3 = COL_ROW
+kickRow.Text = ""; kickRow.AutoButtonColor = false; kickRow.LayoutOrder = nextOrder(cMisc)
+Instance.new("UICorner", kickRow).CornerRadius = UDim.new(0, 8)
+local krStroke = Instance.new("UIStroke", kickRow); krStroke.Color = COL_ROW_STROKE; krStroke.Thickness = 1
+local krIcon = Instance.new("TextLabel", kickRow); krIcon.Size = UDim2.new(0, 30, 0, 30); krIcon.Position = UDim2.new(0, 8, 0.5, -15)
+krIcon.BackgroundTransparency = 1; krIcon.Text = "👥"; krIcon.TextSize = 20
+local krTitle = Instance.new("TextLabel", kickRow); krTitle.Size = UDim2.new(1, -90, 0, 20); krTitle.Position = UDim2.new(0, 42, 0, 7)
+krTitle.BackgroundTransparency = 1; krTitle.Text = "Kicks Bloqueados"; krTitle.TextColor3 = COL_TXT; krTitle.Font = "SourceSansBold"; krTitle.TextSize = 14; krTitle.TextXAlignment = "Left"
+local krSub = Instance.new("TextLabel", kickRow); krSub.Size = UDim2.new(1, -90, 0, 16); krSub.Position = UDim2.new(0, 42, 0, 26)
+krSub.BackgroundTransparency = 1; krSub.Text = "Aparecem aqui."; krSub.TextColor3 = COL_DIM; krSub.TextSize = 12; krSub.TextXAlignment = "Left"
+local krArrow = Instance.new("TextLabel", kickRow); krArrow.Size = UDim2.new(0, 24, 0, 24); krArrow.Position = UDim2.new(1, -30, 0.5, -12)
+krArrow.BackgroundTransparency = 1; krArrow.Text = "›"; krArrow.TextColor3 = COL_DIM; krArrow.TextSize = 20; krArrow.Font = "SourceSansBold"
+
+local kickLogFrame = Instance.new("Frame", cMisc)
+kickLogFrame.LayoutOrder = nextOrder(cMisc)
+kickLogFrame.Size = UDim2.new(1, -8, 0, 90); kickLogFrame.BackgroundColor3 = Color3.fromRGB(13, 8, 20)
+kickLogFrame.Visible = false
+Instance.new("UICorner", kickLogFrame).CornerRadius = UDim.new(0, 8)
+kickLogBox = Instance.new("TextLabel", kickLogFrame)
+kickLogBox.Size = UDim2.new(1, -10, 1, -10); kickLogBox.Position = UDim2.new(0, 5, 0, 5)
+kickLogBox.BackgroundTransparency = 1; kickLogBox.TextXAlignment = "Left"; kickLogBox.TextYAlignment = "Top"
+kickLogBox.TextWrapped = true; kickLogBox.TextSize = 12; kickLogBox.TextColor3 = Color3.fromRGB(220,220,220)
+kickLogBox.Text = "Kicks bloqueados aparecem aqui."
+
+kickRow.MouseButton1Click:Connect(function()
+    kickLogFrame.Visible = not kickLogFrame.Visible
+    krArrow.Text = kickLogFrame.Visible and "⌄" or "›"
+end)
+
+local vPlayers, vPing, vFps
+pcall(function()
+    addSection("ESTATÍSTICAS", cMisc)
+    local statsFrame = Instance.new("Frame", cMisc)
+    statsFrame.LayoutOrder = nextOrder(cMisc)
+    statsFrame.Size = UDim2.new(1, -8, 0, 168); statsFrame.BackgroundColor3 = Color3.fromRGB(10, 6, 16)
+    Instance.new("UICorner", statsFrame).CornerRadius = UDim.new(0, 8)
+    local stStroke = Instance.new("UIStroke", statsFrame); stStroke.Color = COL_GREEN; stStroke.Thickness = 1; stStroke.Transparency = 0.3
+
+    local function statRow(y, label, size)
+        local l = Instance.new("TextLabel", statsFrame)
+        l.Size = UDim2.new(1, -150, 0, 36); l.Position = UDim2.new(0, 12, 0, y)
+        l.BackgroundTransparency = 1; l.TextXAlignment = "Left"
+        l.Font = "SourceSansBold"; l.TextSize = 14; l.TextColor3 = COL_DIM
+        l.Text = label
+        local v = Instance.new("TextLabel", statsFrame)
+        v.Size = UDim2.new(0, 130, 0, 36); v.Position = UDim2.new(1, -142, 0, y)
+        v.BackgroundTransparency = 1; v.TextXAlignment = "Right"
+        v.Font = "SourceSansBold"; v.TextSize = size; v.TextColor3 = Color3.new(1,1,1)
+        v.Text = "—"
+        return v
+    end
+
+    vPlayers = statRow(4, "Jogadores online", 24)
+    vPing = statRow(44, "Ping", 24)
+    vFps = statRow(84, "FPS", 26)
+    local vK = statRow(124, "Kills", 26)
+    task.spawn(function()
+        while vivo() do
+            task.wait(0.5)
+            vK.Text = tostring(kills)
+        end
+    end)
+end)
+
+pcall(function()
+    addSection("CONEXÃO", cMisc)
+    local btnRejoin = Instance.new("TextButton", cMisc)
+    btnRejoin.LayoutOrder = nextOrder(cMisc)
+    btnRejoin.Size = UDim2.new(1, -8, 0, 40); btnRejoin.BackgroundColor3 = Color3.fromRGB(88, 36, 150)
+    btnRejoin.TextColor3 = Color3.new(1,1,1); btnRejoin.Font = "SourceSansBold"; btnRejoin.TextSize = 14
+    btnRejoin.Text = "RECONECTAR AGORA"; btnRejoin.AutoButtonColor = false
+    Instance.new("UICorner", btnRejoin).CornerRadius = UDim.new(0, 8)
+    btnRejoin.MouseButton1Click:Connect(function()
+        cfg._rejoining = false
+        queueRejoin()
+    end)
+
+    local btnTrocar = Instance.new("TextButton", cMisc)
+    btnTrocar.LayoutOrder = nextOrder(cMisc)
+    btnTrocar.Size = UDim2.new(1, -8, 0, 40); btnTrocar.BackgroundColor3 = Color3.fromRGB(60, 40, 90)
+    btnTrocar.TextColor3 = Color3.new(1,1,1); btnTrocar.Font = "SourceSansBold"; btnTrocar.TextSize = 14
+    btnTrocar.Text = "TROCAR DE SERVIDOR"; btnTrocar.AutoButtonColor = false
+    Instance.new("UICorner", btnTrocar).CornerRadius = UDim.new(0, 8)
+    btnTrocar.MouseButton1Click:Connect(function()
+        soltarHooks()
+        pcall(function() TeleportService:Teleport(game.PlaceId) end)
+    end)
+end)
+
+pcall(function()
+    addSection("CRÉDITOS", cMisc)
+    addCreditText("Executor: Delta", cMisc)
+    addCreditText("Versão do Hub: 7.6", cMisc)
+    addCreditText("Criadores: Mz Studio", cMisc)
+    addCreditText("Créditos: Mz mod", cMisc)
+
+    local btnDiscord = Instance.new("TextButton", cMisc)
+    btnDiscord.LayoutOrder = nextOrder(cMisc)
+    btnDiscord.Size = UDim2.new(1, -8, 0, 42)
+    btnDiscord.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    btnDiscord.TextColor3 = Color3.new(1,1,1); btnDiscord.Font = "SourceSansBold"; btnDiscord.TextSize = 14
+    btnDiscord.Text = "COPIAR LINK DO DISCORD"; btnDiscord.AutoButtonColor = false
+    Instance.new("UICorner", btnDiscord).CornerRadius = UDim.new(0, 8)
+    btnDiscord.MouseButton1Click:Connect(function()
+        if setclipboard then
+            setclipboard("https://discord.gg/q8gpA7CnF")
+            btnDiscord.Text = "LINK COPIADO!"
+            task.delay(2, function() btnDiscord.Text = "COPIAR LINK DO DISCORD" end)
+        else
+            btnDiscord.Text = "ERRO: SEM SUPORTE"
+            task.delay(2, function() btnDiscord.Text = "COPIAR LINK DO DISCORD" end)
+        end
+    end)
+end)
+
+local frames = 0
+RunService.RenderStepped:Connect(function()
+    if vivo() then frames = frames + 1 end
+end)
+
+task.spawn(function()
+    while vivo() and mainGui.Parent do
+        task.wait(1)
+        local qtd = #Players:GetPlayers()
+        contLabel.Text = tostring(qtd) .. " JOGADORES"
+        hudFps.Text = tostring(frames)
+        if vPlayers then vPlayers.Text = tostring(qtd) .. " / " .. tostring(Players.MaxPlayers) end
+        if vPing then
+            local ping = 0
+            pcall(function()
+                ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+            end)
+            hudPing.Text = tostring(ping)
+            vPing.Text = tostring(ping) .. " ms"
+        end
+        if vFps then vFps.Text = tostring(frames) end
+        frames = 0
+    end
+end)
+
+bubble.MouseButton1Click:Connect(function()
+    if main.Visible then
+        main.Visible = false
+    else
+        main.Position = UDim2.new(0.5, -230, 0.5, -190)
+        main.Visible = true
+    end
+end)
+
+RunService.RenderStepped:Connect(safeLoop(function()
+    if not vivo() then return end
+    fovFrame.Visible = cfg.FOV or cfg.NpcFOV
+    fovFrame.Size = UDim2.new(0, cfg.FOVSize*2, 0, cfg.FOVSize*2)
+    fovFrame.Position = UDim2.new(0.5, -cfg.FOVSize, 0.5, -cfg.FOVSize + cfg.FOVPos)
+
+    local bgColor = getRealColor()
+    local darkBg = Color3.new(bgColor.R * 0.12, bgColor.G * 0.14, bgColor.B * 0.12)
+    main.BackgroundColor3 = darkBg
+    confirmFrame.BackgroundColor3 = darkBg
+
+    local transp = cfg.Transp and 0.8 or 0
+    main.BackgroundTransparency = transp
+    confirmFrame.BackgroundTransparency = transp
+
+    local borderColor
+    if cfg.LEDActive then
+        local hue = (tick() * (cfg.LEDSpeed / 10)) % 1
+        borderColor = Color3.fromHSV(hue, 1, 1)
+    else
+        borderColor = bgColor
+    end
+
+    fovStroke.Color = borderColor
+    mStroke.Color = borderColor
+    bStroke.Color = borderColor
+    cStroke.Color = borderColor
+    title.TextColor3 = borderColor
+    tpStroke.Color = borderColor
+    hudStroke.Color = borderColor
+
+    if cfg.ESP then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                updateESP(player, borderColor)
+            end
+        end
+    else
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                clearESP(player)
+            end
+        end
+    end
+end))
+
+RunService.RenderStepped:Connect(safeLoop(function()
+    if not vivo() then return end
+    if cfg.Stealth then
+        if bubble.Visible then bubble.Visible = false end
+        if main.Visible then main.Visible = false end
+        if hud.Visible then hud.Visible = false end
+    elseif not cfg.AntiScreenshot then
+        if not bubble.Visible then bubble.Visible = true end
+        if not hud.Visible then hud.Visible = true end
+    end
+end))
+
+btnClose.MouseButton1Click:Connect(function() confirmFrame.Visible = true end)
+bNao.MouseButton1Click:Connect(function() confirmFrame.Visible = false end)
+bSim.MouseButton1Click:Connect(function()
+    if getgenv().MZ_UNLOAD then
+        getgenv().MZ_UNLOAD()
+    else
+        mainGui:Destroy()
+    end
+end)
+
+btnMin.MouseButton1Click:Connect(function()
+    if main.Size.Y.Offset == 380 then
+        main.Size = UDim2.new(0, 460, 0, 46)
+    else
+        main.Size = UDim2.new(0, 460, 0, 380)
+    end
+end)
+
+getgenv().MZ_UNLOAD = function()
+    getgenv().MZ_TAG = nil
+    pcall(soltarHooks)
+    pcall(function() RunService:UnbindFromRenderStep("MzAimbot") end)
+    if bodyVel then pcall(function() bodyVel:Destroy() end) end
+    for _, line in pairs(tracers) do pcall(function() line:Remove() end) end
+    for _, hl in pairs(highlights) do pcall(function() hl:Destroy() end) end
+    pcall(clearCarESP)
+    pcall(clearNpcESP)
+    pcall(function() mainGui:Destroy() end)
+    getgenv().MZ_UNLOAD = nil
+end
+
+stopSpin() 
